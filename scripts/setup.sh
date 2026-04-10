@@ -1,46 +1,35 @@
-#!/usr/bin/env bash
+#!/usr/bin/env fish
 
 echo "=== KORUS — Setup do ambiente ==="
-
-# Parar em caso de erro
-set -e
 
 # Backend
 echo ""
 echo "→ Instalando dependências do backend..."
-cd backend || exit
+cd backend
 npm install
-
-# Copiar .env se não existir
-if [ ! -f .env ]; then
-  cp .env.example .env
-fi
-
+cp -n .env.example .env
 echo "✓ Backend pronto. Edite o arquivo backend/.env com suas credenciais do banco."
 
 # Frontend
 echo ""
 echo "→ Instalando dependências do frontend..."
-cd ../frontend || exit
+cd ../frontend
 npm install
 echo "✓ Frontend pronto."
 
 # Electron
 echo ""
 echo "→ Instalando dependências do Electron..."
-cd ../electron || exit
+cd ../electron
 npm install
 echo "✓ Electron pronto."
 
-# Voltar para raiz
 cd ..
-
 echo ""
 echo "=== Setup concluído ==="
 echo ""
 echo "Próximos passos:"
-echo "  1. Configure o PostgreSQL e edite backend/.env"
-echo "  2. cd backend && npm run migrate"
-echo "  3. cd backend && npm run seed"
-echo "  4. cd backend && npm run dev"
-echo "  5. cd frontend && npm run dev"
+echo "  1. Configure o projeto no Supabase e edite backend/.env com SUPABASE_URL e SUPABASE_KEY"
+echo "  2. cd backend && npm run dev"
+echo "  3. cd frontend && npm run dev"
+echo "  4. Em outro terminal: cd electron && npm start"
