@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { useSetores } from '../hooks/useSetores'
 import Modal from '../components/shared/Modal'
 
+const ANO_INICIO = 2024
+
 const DIRECAO_OPTS = [
   { value: 'MAXIMIZAR', label: '↑ Maximizar', desc: 'Quanto maior, melhor (ex: faturamento)' },
   { value: 'MINIMIZAR', label: '↓ Minimizar', desc: 'Quanto menor, melhor (ex: custo, faltas)' },
@@ -28,6 +30,7 @@ const EMPTY_FORM = {
   frequencia: 'MENSAL',
   dia_lancamento: '28',
   semestre: 'FEV_SET',
+  ano: String(new Date().getFullYear()),
   multiSetor: false,
   setores_adicionais: [],
   ranges: [
@@ -101,6 +104,8 @@ function RangeEditor({ ranges, onChange, direcao }) {
 
 function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   const isEdit = modo === 'editar'
+  const anoAtual = new Date().getFullYear()
+
   const [form, setForm] = useState(() => {
     if (isEdit && meta) {
       return {
@@ -113,6 +118,7 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         frequencia: meta.frequencia ?? 'MENSAL',
         dia_lancamento: meta.dia_lancamento ?? '28',
         semestre: meta.semestre ?? 'FEV_SET',
+        ano: meta.ano ? String(meta.ano) : String(anoAtual),
         ranges: meta.ranges ?? EMPTY_FORM.ranges,
       }
     }
@@ -141,6 +147,7 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         frequencia: form.frequencia,
         dia_lancamento: Number(form.dia_lancamento),
         semestre: form.semestre,
+        ano: Number(form.ano) || anoAtual,
         ranges: form.ranges,
       })
       onClose()
@@ -233,13 +240,23 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
           </div>
         </div>
 
-        {/* Semestre + Prazo */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Semestre + Ano + Prazo */}
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="label">Ciclo semestral</label>
             <select className="input" value={form.semestre} onChange={e => set('semestre', e.target.value)}>
               {SEMESTRES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="label">Ano de referência</label>
+            <input
+              className="input font-mono"
+              placeholder={String(anoAtual)}
+              value={form.ano}
+              onChange={e => set('ano', e.target.value)}
+              maxLength={4}
+            />
           </div>
           <div>
             <label className="label">Dia limite de lançamento</label>
@@ -343,12 +360,19 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo }) {
 }
 
 export default function MetasPage() {
+  const anoAtual = new Date().getFullYear()
+  const anosDisponiveis = Array.from(
+    { length: anoAtual - ANO_INICIO + 1 },
+    (_, i) => ANO_INICIO + i
+  )
+
   const [metas, setMetas] = useState([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(null)
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroSemestre, setFiltroSemestre] = useState('')
+  const [filtroAno, setFiltroAno] = useState(String(anoAtual))
   const { setores } = useSetores()
 
   const fetchMetas = useCallback(async () => {
@@ -360,12 +384,13 @@ export default function MetasPage() {
 
     if (filtroSetor) query = query.eq('setor_id', filtroSetor)
     if (filtroSemestre) query = query.eq('semestre', filtroSemestre)
+    if (filtroAno) query = query.eq('ano', Number(filtroAno))
 
     const { data, error } = await query
     if (error) setErro(error.message)
     else setMetas(data ?? [])
     setLoading(false)
-  }, [filtroSetor, filtroSemestre])
+  }, [filtroSetor, filtroSemestre, filtroAno])
 
   useEffect(() => {
     fetchMetas()
@@ -408,6 +433,14 @@ export default function MetasPage() {
   const pesoTotal = metas.filter(m => m.ativa !== false && (!filtroSetor || m.setor_id === filtroSetor))
     .reduce((s, m) => s + (Number(m.peso) || 0), 0)
 
+  const temFiltroAtivo = filtroSetor || filtroSemestre || filtroAno
+
+  function limparFiltros() {
+    setFiltroSetor('')
+    setFiltroSemestre('')
+    setFiltroAno('')
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -430,21 +463,66 @@ export default function MetasPage() {
       </div>
 
       {/* Filtros */}
-      <div className="px-6 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 flex-wrap">
-        <span className="text-xs text-slate-500 uppercase tracking-wider">Filtros</span>
-        <select className="input w-auto text-xs py-1.5 px-2" value={filtroSetor} onChange={e => setFiltroSetor(e.target.value)}>
-          <option value="">Todos os setores</option>
-          {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-        </select>
-        <select className="input w-auto text-xs py-1.5 px-2" value={filtroSemestre} onChange={e => setFiltroSemestre(e.target.value)}>
-          <option value="">Todos os semestres</option>
-          {SEMESTRES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        {(filtroSetor || filtroSemestre) && (
-          <button className="btn text-xs py-1.5 text-slate-400" onClick={() => { setFiltroSetor(''); setFiltroSemestre('') }}>
-            Limpar
-          </button>
-        )}
+      <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
+        <div className="flex items-end gap-5 flex-wrap">
+
+          {/* Filtro: Setores */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Setores
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroSetor}
+              onChange={e => setFiltroSetor(e.target.value)}
+            >
+              <option value="">Todos os setores</option>
+              {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
+          </div>
+
+          {/* Filtro: Semestre */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Semestre
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroSemestre}
+              onChange={e => setFiltroSemestre(e.target.value)}
+            >
+              <option value="">Todos os semestres</option>
+              {SEMESTRES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+
+          {/* Filtro: Ano */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Ano
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroAno}
+              onChange={e => setFiltroAno(e.target.value)}
+            >
+              <option value="">Todos os anos</option>
+              {anosDisponiveis.map(ano => (
+                <option key={ano} value={String(ano)}>{ano}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Limpar filtros */}
+          {temFiltroAtivo && (
+            <button
+              className="btn text-xs py-1.5 text-slate-400 self-end"
+              onClick={limparFiltros}
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Content */}

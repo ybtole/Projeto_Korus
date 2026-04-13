@@ -5,17 +5,38 @@ import { useConnectionStatus } from '../hooks/useRealtimeSync'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const MES_LABEL = {
-  '2025-01': 'Jan', '2025-02': 'Fev', '2025-03': 'Mar',
-  '2025-04': 'Abr', '2025-05': 'Mai', '2025-06': 'Jun',
-  '2025-07': 'Jul', '2025-08': 'Ago', '2025-09': 'Set',
-  '2025-10': 'Out', '2025-11': 'Nov', '2025-12': 'Dez',
-  '2026-01': 'Jan', '2026-02': 'Fev', '2026-03': 'Mar',
+// Gera label de mês a partir de 'YYYY-MM'
+function getMesLabel(mesKey) {
+  const LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  const [, m] = mesKey.split('-')
+  return LABELS[parseInt(m, 10) - 1] ?? mesKey
 }
 
-const MESES_SEMESTRE = {
-  FEV_SET: ['2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07', '2025-08', '2025-09'],
-  SET_MAR: ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'],
+// Retorna os meses de cada semestre para um determinado ano
+function getMesesSemestre(semestre, ano) {
+  if (semestre === 'FEV_SET') {
+    return [
+      `${ano}-02`, `${ano}-03`, `${ano}-04`, `${ano}-05`,
+      `${ano}-06`, `${ano}-07`, `${ano}-08`, `${ano}-09`,
+    ]
+  }
+  // SET_MAR: set do ano corrente até mar do ano seguinte
+  const anoSeguinte = ano + 1
+  return [
+    `${ano}-09`, `${ano}-10`, `${ano}-11`, `${ano}-12`,
+    `${anoSeguinte}-01`, `${anoSeguinte}-02`, `${anoSeguinte}-03`,
+  ]
+}
+
+// Retorna array de anos disponíveis: do ano de início do sistema até o ano atual
+function getAnosDisponiveis() {
+  const ANO_INICIO = 2025
+  const anoAtual = new Date().getFullYear()
+  const anos = []
+  for (let a = ANO_INICIO; a <= anoAtual; a++) {
+    anos.push(a)
+  }
+  return anos
 }
 
 const STATUS_CONFIG = {
@@ -320,7 +341,7 @@ function AlertaRow({ lancamento, meta, tipo }) {
           {meta?.nome ?? '—'}
         </p>
         <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', margin: '2px 0 0' }}>
-          {MES_LABEL[lancamento.mes_referencia] ?? lancamento.mes_referencia}
+          {getMesLabel(lancamento.mes_referencia)}
           {lancamento.observacoes ? ` · ${lancamento.observacoes}` : ''}
         </p>
       </div>
@@ -335,8 +356,104 @@ function AlertaRow({ lancamento, meta, tipo }) {
   )
 }
 
+// ── FilterBar — barra de filtros com labels, setor, semestre e ano ─────────────
+function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, setores }) {
+  const anos = getAnosDisponiveis()
+
+  // Estilo compartilhado para os selects
+  const selectStyle = {
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    color: '#94a3b8',
+    fontSize: 11,
+    padding: '4px 8px',
+    fontFamily: 'IBM Plex Mono, monospace',
+    cursor: 'pointer',
+    outline: 'none',
+    width: '100%',
+  }
+
+  // Estilo do label acima de cada filtro
+  const labelStyle = {
+    fontSize: 9,
+    fontFamily: 'IBM Plex Mono, monospace',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    color: 'rgba(148,163,184,0.4)',
+    marginBottom: 4,
+    display: 'block',
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: 12,
+      padding: '6px 14px',
+      background: 'rgba(52,211,153,0.08)',
+      border: '1px solid rgba(52,211,153,0.2)',
+      borderRadius: 6,
+      width: 'fit-content',
+    }}>
+      {/* Indicador de tempo real */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 4, flexShrink: 0 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'block', animation: 'ping 1.5s infinite' }} />
+        <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'IBM Plex Mono, monospace', whiteSpace: 'nowrap' }}>
+          Dados em tempo real
+        </span>
+      </div>
+
+      {/* Separador */}
+      <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+
+      {/* Filtro: Setor */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={labelStyle}>Setor</span>
+        <select
+          value={setorId}
+          onChange={e => setSetorId(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="">Todos</option>
+          {setores.map(s => (
+            <option key={s.id} value={s.id}>{s.nome}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Filtro: Semestre */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={labelStyle}>Semestre</span>
+        <select
+          value={semestre}
+          onChange={e => setSemestre(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="FEV_SET">Fev → Set</option>
+          <option value="SET_MAR">Set → Mar</option>
+        </select>
+      </div>
+
+      {/* Filtro: Ano — com scroll nativo do select */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={labelStyle}>Ano</span>
+        <select
+          value={ano}
+          onChange={e => setAno(Number(e.target.value))}
+          style={{ ...selectStyle, minWidth: 64 }}
+        >
+          {anos.map(a => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 // ─── Aba Geral ────────────────────────────────────────────────────────────────
-function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre }) {
+function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, setAno, setorId, setSetorId }) {
   const aprovados = lancamentos.filter(l => l.status === 'APROVADO').length
   const total = lancamentos.length
   const emAndamento = lancamentos.filter(l => l.status === 'EM_ANDAMENTO').length
@@ -348,8 +465,8 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre }) {
     if (l.status !== 'PENDENTE') return false
     const meta = metas.find(m => m.id === l.meta_id)
     if (!meta) return false
-    const [ano, mesNum] = l.mes_referencia.split('-').map(Number)
-    return hoje > new Date(ano, mesNum - 1, meta.dia_lancamento ?? 28)
+    const [anoRef, mesNum] = l.mes_referencia.split('-').map(Number)
+    return hoje > new Date(anoRef, mesNum - 1, meta.dia_lancamento ?? 28)
   }).length
 
   // PPR geral acumulado
@@ -361,8 +478,12 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre }) {
     if (pct !== null) pprGanho += (pct / 100) * ((Number(meta.peso) || 0) / 6)
   })
 
-  // Por setor
-  const porSetor = setores.map(s => {
+  // Por setor — filtra apenas os setores relevantes ao filtro atual
+  const setoresFiltrados = setorId
+    ? setores.filter(s => String(s.id) === String(setorId))
+    : setores
+
+  const porSetor = setoresFiltrados.map(s => {
     const metasS = metas.filter(m => m.setor_id === s.id)
     const lancsS = lancamentos.filter(l => metasS.some(m => m.id === l.meta_id))
     const aprovadosS = lancsS.filter(l => l.status === 'APROVADO').length
@@ -373,39 +494,16 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre }) {
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Status realtime */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '6px 14px',
-        background: 'rgba(52,211,153,0.08)',
-        border: '1px solid rgba(52,211,153,0.2)',
-        borderRadius: 6,
-        width: 'fit-content',
-      }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'block', animation: 'ping 1.5s infinite' }} />
-        <span style={{ fontSize: 11, color: '#34d399', fontFamily: 'IBM Plex Mono, monospace' }}>
-          Dados atualizados em tempo real
-        </span>
-        <span style={{ marginLeft: 12, display: 'flex', gap: 8 }}>
-          <select
-            value={semestre}
-            onChange={e => setSemestre(e.target.value)}
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 4,
-              color: '#94a3b8',
-              fontSize: 11,
-              padding: '2px 6px',
-              fontFamily: 'IBM Plex Mono, monospace',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="FEV_SET">Fev → Set 2025</option>
-            <option value="SET_MAR">Set → Mar 2025/26</option>
-          </select>
-        </span>
-      </div>
+      {/* Barra de filtros */}
+      <FilterBar
+        semestre={semestre}
+        setSemestre={setSemestre}
+        ano={ano}
+        setAno={setAno}
+        setorId={setorId}
+        setSetorId={setSetorId}
+        setores={setores}
+      />
 
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -653,8 +751,8 @@ function AbaPendentes({ lancamentos, metas }) {
     if (l.status !== 'PENDENTE') return false
     const meta = metas.find(m => m.id === l.meta_id)
     if (!meta) return false
-    const [ano, mesNum] = l.mes_referencia.split('-').map(Number)
-    return hoje > new Date(ano, mesNum - 1, meta.dia_lancamento ?? 28)
+    const [anoRef, mesNum] = l.mes_referencia.split('-').map(Number)
+    return hoje > new Date(anoRef, mesNum - 1, meta.dia_lancamento ?? 28)
   })
 
   const aguardando = lancamentos.filter(l => l.status === 'AGUARDANDO_APROVACAO')
@@ -821,16 +919,23 @@ function AbaAnalise({ lancamentos, metas, setores }) {
 // ─── Dashboard Principal ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [aba, setAba] = useState('geral')
-  const [lancamentos, setLancamentos] = useState([])
-  const [metas, setMetas] = useState([])
+  const [lancamentosRaw, setLancamentosRaw] = useState([])
+  const [metasRaw, setMetasRaw] = useState([])
   const [loading, setLoading] = useState(true)
   const [semestre, setSemestre] = useState('FEV_SET')
+  const [ano, setAno] = useState(new Date().getFullYear())
+  const [setorId, setSetorId] = useState('') // '' = todos
   const [lastUpdate, setLastUpdate] = useState('—')
   const { setores } = useSetores()
   const connStatus = useConnectionStatus()
 
+  // Meses do semestre/ano selecionados
+  const mesesSemestre = getMesesSemestre(semestre, ano)
+
+  // Fetch sempre busca pelo semestre+ano atual (sem filtro de setor no banco,
+  // pois o filtro de setor é aplicado localmente para não perder dados de relacionamento)
   const fetchData = useCallback(async () => {
-    const meses = MESES_SEMESTRE[semestre] ?? []
+    const meses = getMesesSemestre(semestre, ano)
     const [{ data: metasData }, { data: lancsData }] = await Promise.all([
       supabase.from('metas').select('*, setores(nome)').order('nome'),
       supabase
@@ -839,11 +944,11 @@ export default function DashboardPage() {
         .in('mes_referencia', meses)
         .order('data_criacao', { ascending: false }),
     ])
-    setMetas(metasData ?? [])
-    setLancamentos(lancsData ?? [])
+    setMetasRaw(metasData ?? [])
+    setLancamentosRaw(lancsData ?? [])
     setLastUpdate(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
     setLoading(false)
-  }, [semestre])
+  }, [semestre, ano])
 
   useEffect(() => {
     fetchData()
@@ -854,6 +959,20 @@ export default function DashboardPage() {
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [fetchData])
+
+  // ── Filtro local por setor ──────────────────────────────────────────────────
+  // Aplica o filtro de setor sobre os dados crus, sem nova requisição ao banco.
+  // O setor_id da meta está em meta.setor_id (campo da tabela) OU em
+  // lancamento.metas.setor_id (join). Usamos metasRaw como fonte de verdade.
+  const metasFiltradas = setorId
+    ? metasRaw.filter(m => String(m.setor_id) === String(setorId))
+    : metasRaw
+
+  const metaIdsFiltrados = new Set(metasFiltradas.map(m => m.id))
+
+  const lancamentosFiltrados = setorId
+    ? lancamentosRaw.filter(l => metaIdsFiltrados.has(l.meta_id))
+    : lancamentosRaw
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1e30', fontFamily: 'IBM Plex Sans, sans-serif' }}>
@@ -907,7 +1026,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Tab Bar ── */}
-      <TabBar aba={aba} setAba={setAba} connStatus={connStatus} lancamentos={lancamentos} />
+      <TabBar aba={aba} setAba={setAba} connStatus={connStatus} lancamentos={lancamentosFiltrados} />
 
       {/* ── Conteúdo ── */}
       <div style={{ flex: 1, overflow: 'auto' }}>
@@ -920,25 +1039,36 @@ export default function DashboardPage() {
           <>
             {aba === 'geral' && (
               <AbaGeral
-                lancamentos={lancamentos}
-                metas={metas}
+                lancamentos={lancamentosFiltrados}
+                metas={metasFiltradas}
                 setores={setores}
                 semestre={semestre}
                 setSemestre={setSemestre}
+                ano={ano}
+                setAno={setAno}
+                setorId={setorId}
+                setSetorId={setSetorId}
               />
             )}
             {aba === 'ao_vivo' && (
               <AbaAoVivo
-                lancamentos={lancamentos}
-                metas={metas}
+                lancamentos={lancamentosFiltrados}
+                metas={metasFiltradas}
                 lastUpdate={lastUpdate}
               />
             )}
             {aba === 'pendentes' && (
-              <AbaPendentes lancamentos={lancamentos} metas={metas} />
+              <AbaPendentes
+                lancamentos={lancamentosFiltrados}
+                metas={metasFiltradas}
+              />
             )}
             {aba === 'analise' && (
-              <AbaAnalise lancamentos={lancamentos} metas={metas} setores={setores} />
+              <AbaAnalise
+                lancamentos={lancamentosFiltrados}
+                metas={metasFiltradas}
+                setores={setores}
+              />
             )}
           </>
         )}
