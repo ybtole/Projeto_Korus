@@ -2,10 +2,10 @@ import { useState, useCallback } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useLancamentos } from '../hooks/useLancamentos'
 import { useSetores } from '../hooks/useSetores'
+import { useMetas } from '../hooks/useMetas'
 import KanbanBoard from '../components/kanban/KanbanBoard'
 import CardModal from '../components/kanban/CardModal'
 import Modal from '../components/shared/Modal'
-import { supabase } from '../lib/supabase'
 
 const MESES = ['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
                '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12']
@@ -22,12 +22,16 @@ export default function KanbanPage({ session }) {
   const [cardModal, setCardModal] = useState(null)
   const [novoModal, setNovoModal] = useState(false)
   const [novoForm, setNovoForm] = useState({ meta_id: '', mes_referencia: '', valor: '' })
+  // Setor selecionado dentro do modal de novo lançamento (para filtrar metas)
+  const [setorMeta, setSetorMeta] = useState('')
 
   const { lancamentos, loading, erro, atualizarStatus, salvar, criar } = useLancamentos({
     setor_id: filtroSetor || undefined,
     mes: filtroMes || undefined,
   })
   const { setores } = useSetores()
+  // Metas filtradas pelo setor escolhido no modal
+  const { metas, loading: loadingMetas } = useMetas(setorMeta || null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -65,6 +69,7 @@ export default function KanbanPage({ session }) {
       })
       setNovoModal(false)
       setNovoForm({ meta_id: '', mes_referencia: '', valor: '' })
+      setSetorMeta('')
     } catch (err) {
       alert(err.message)
     }
@@ -161,16 +166,46 @@ export default function KanbanPage({ session }) {
       {novoModal && (
         <Modal title="Novo Lançamento" onClose={() => setNovoModal(false)}>
           <form onSubmit={handleCriar} className="flex flex-col gap-4">
+            {/* 1. Filtro de setor para restringir a lista de metas */}
             <div>
-              <label className="label">ID da Meta</label>
-              <input
-                className="input font-mono"
-                placeholder="UUID da meta"
+              <label className="label">Setor</label>
+              <select
+                className="input"
+                value={setorMeta}
+                onChange={e => {
+                  setSetorMeta(e.target.value)
+                  setNovoForm(f => ({ ...f, meta_id: '' })) // limpa meta ao trocar setor
+                }}
+              >
+                <option value="">Todos os setores</option>
+                {setores.map(s => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Select de meta filtrado pelo setor */}
+            <div>
+              <label className="label">Meta</label>
+              <select
+                className="input"
                 value={novoForm.meta_id}
                 onChange={e => setNovoForm(f => ({ ...f, meta_id: e.target.value }))}
                 required
-              />
-              <p className="text-xs text-slate-600 mt-1">Cole o ID da meta cadastrada no banco.</p>
+                disabled={loadingMetas}
+              >
+                <option value="">
+                  {loadingMetas ? 'Carregando metas…' : 'Selecione uma meta'}
+                </option>
+                {metas.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}{m.unidade ? ` (${m.unidade})` : ''}
+                  </option>
+                ))}
+              </select>
+              {!loadingMetas && metas.length === 0 && setorMeta && (
+                <p className="text-xs text-amber-500 mt-1">Nenhuma meta encontrada para este setor.</p>
+              )}
             </div>
             <div>
               <label className="label">Mês de referência</label>

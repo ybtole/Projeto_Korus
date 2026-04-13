@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useRealtimeSync } from './useRealtimeSync'
 
 export function useSetores() {
   const [setores, setSetores] = useState([])
@@ -13,20 +14,14 @@ export function useSetores() {
       .select('*')
       .order('nome')
     if (error) setErro(error.message)
-    else setSetores(data ?? [])
+    else { setSetores(data ?? []); setErro(null) }
     setLoading(false)
   }, [])
 
-  useEffect(() => {
-    fetch()
+  useEffect(() => { fetch() }, [fetch])
 
-    const channel = supabase
-      .channel('setores-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'setores' }, fetch)
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }, [fetch])
+  // Sincronização realtime — canal compartilhado, sem WebSocket extra
+  useRealtimeSync({ setores: fetch })
 
   const criar = async ({ nome, tipo, parent_id }) => {
     const { error } = await supabase.from('setores').insert({ nome, tipo, parent_id: parent_id ?? null })
@@ -45,5 +40,5 @@ export function useSetores() {
     if (error) throw error
   }
 
-  return { setores, loading, erro, criar, editar, excluir }
+  return { setores, loading, erro, criar, editar, excluir, refetch: fetch }
 }

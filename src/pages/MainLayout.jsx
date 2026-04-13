@@ -1,81 +1,220 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import OrgTreePage from './OrgTreePage'
-import KanbanPage from './KanbanPage'
+import { useConnectionStatus } from '../hooks/useRealtimeSync'
+import OrgTreePage    from './OrgTreePage'
+import KanbanPage     from './KanbanPage'
+import MetasPage      from './MetasPage'
+import DashboardPage  from './DashboardPage'
+
+// ─── Navegação ────────────────────────────────────────────────────────────────
 
 const NAV = [
-  { id: 'tree',   label: 'Estrutura',  icon: 'M3 7h18M3 12h18M3 17h18' },
-  { id: 'kanban', label: 'Kanban',     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+  {
+    id: 'dashboard',
+    label: 'Dashboard PPR',
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'metas',
+    label: 'Metas',
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="12" y1="3" x2="12" y2="5"/>
+        <line x1="12" y1="19" x2="12" y2="21"/>
+        <line x1="3" y1="12" x2="5" y2="12"/>
+        <line x1="19" y1="12" x2="21" y2="12"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'kanban',
+    label: 'Lançamentos',
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        <rect x="9" y="3" width="6" height="4" rx="1"/>
+        <line x1="9" y1="12" x2="15" y2="12"/>
+        <line x1="9" y1="16" x2="13" y2="16"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'tree',
+    label: 'Estrutura org.',
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="2" width="6" height="4" rx="1"/>
+        <rect x="2" y="16" width="6" height="4" rx="1"/>
+        <rect x="9" y="16" width="6" height="4" rx="1"/>
+        <rect x="16" y="16" width="6" height="4" rx="1"/>
+        <line x1="12" y1="6" x2="12" y2="11"/>
+        <line x1="5"  y1="11" x2="19" y2="11"/>
+        <line x1="5"  y1="11" x2="5"  y2="16"/>
+        <line x1="12" y1="11" x2="12" y2="16"/>
+        <line x1="19" y1="11" x2="19" y2="16"/>
+      </svg>
+    ),
+  },
 ]
 
-export default function MainLayout({ session }) {
-  const [page, setPage] = useState('tree')
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
 
-  const cpf = session.user.email?.replace('@aguia.com', '') ?? '—'
+function NavBadge({ count }) {
+  if (!count) return null
+  return (
+    <span className="ml-auto text-[10px] bg-red-500 text-white rounded-full px-1.5 min-w-[18px] text-center leading-5 font-mono tabular-nums">
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
+function ConnectionDot({ status }) {
+  const map = {
+    connected:    { color: 'bg-green-400', label: 'Realtime ativo',   pulse: true  },
+    connecting:   { color: 'bg-amber-400', label: 'Conectando...',    pulse: true  },
+    disconnected: { color: 'bg-red-500',   label: 'Sem conexão',      pulse: false },
+  }
+  const cfg = map[status] ?? map.connecting
 
   return (
+    <span className="flex items-center gap-1.5">
+      <span className="relative flex h-2 w-2">
+        {cfg.pulse && (
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${cfg.color} opacity-60`} />
+        )}
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${cfg.color}`} />
+      </span>
+      <span className="text-[10px] text-slate-500">{cfg.label}</span>
+    </span>
+  )
+}
+
+// ─── MainLayout ───────────────────────────────────────────────────────────────
+
+export default function MainLayout({ session }) {
+  const [page, setPage]   = useState('dashboard')
+  const [badges, setBadges] = useState({ kanban: 0 })
+  const connStatus = useConnectionStatus()
+
+  const cpf   = session.user.email?.replace('@aguia.com', '') ?? '—'
+  const papel = session.user.user_metadata?.papel ?? 'Usuário'
+
+  // ── Badges: contar lançamentos aguardando aprovação ─────────────────────────
+  const fetchBadges = useCallback(async () => {
+    const { count } = await supabase
+      .from('lancamentos')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'AGUARDANDO_APROVACAO')
+    setBadges(b => ({ ...b, kanban: count ?? 0 }))
+  }, [])
+
+  useEffect(() => {
+    fetchBadges()
+
+    // Canal dedicado para badges — atualiza o número no menu em tempo real
+    const channel = supabase
+      .channel('main-badges')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, fetchBadges)
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [fetchBadges])
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
     <div className="min-h-screen flex bg-brand-900">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 border-r border-white/8 flex flex-col">
-        {/* Brand */}
+
+      {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
+      <aside
+        className="w-56 flex-shrink-0 flex flex-col border-r border-white/8"
+        style={{ minHeight: '100vh', position: 'sticky', top: 0, height: '100vh' }}
+      >
+        {/* Marca */}
         <div className="px-4 py-5 border-b border-white/8">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-500/30 border border-brand-500/40 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-brand-500/30 border border-brand-500/40 flex items-center justify-center flex-shrink-0">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-white leading-none">PCM Águia</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white leading-none truncate">PCM Águia</p>
               <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Gestão PPR</p>
             </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5">
-          {NAV.map(n => (
-            <button
-              key={n.id}
-              onClick={() => setPage(n.id)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all w-full text-left
-                ${page === n.id
-                  ? 'bg-brand-500/20 text-brand-200 border border-brand-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-            >
-              <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d={n.icon} />
-              </svg>
-              {n.label}
-            </button>
-          ))}
+        {/* Navegação */}
+        <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
+          {NAV.map(n => {
+            const isActive = page === n.id
+            return (
+              <button
+                key={n.id}
+                onClick={() => setPage(n.id)}
+                className={[
+                  'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm w-full text-left',
+                  'transition-colors duration-100 select-none',
+                  isActive
+                    ? 'bg-brand-500/20 text-brand-200 border border-brand-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent',
+                ].join(' ')}
+              >
+                {n.icon}
+                <span className="flex-1 truncate">{n.label}</span>
+                <NavBadge count={n.id === 'kanban' ? badges.kanban : 0} />
+              </button>
+            )
+          })}
+
+          {/* ── Informações do ciclo ─────────────────────────────────────── */}
+          <div className="mx-1 my-3 h-px bg-white/8" />
+          <div className="px-3 py-1.5 flex flex-col gap-0.5">
+            <p className="text-[10px] text-slate-600 uppercase tracking-wider">Ciclo ativo</p>
+            <p className="text-xs text-slate-400 font-mono">Fev → Set 2025</p>
+          </div>
+
+          {/* ── Status de conexão ────────────────────────────────────────── */}
+          <div className="px-3 py-1.5">
+            <ConnectionDot status={connStatus} />
+          </div>
         </nav>
 
-        {/* User */}
-        <div className="px-4 py-4 border-t border-white/8">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-7 h-7 rounded-full bg-brand-500/30 flex items-center justify-center text-xs text-brand-200 font-mono flex-shrink-0">
-              {cpf.slice(0, 3)}
+        {/* ── Usuário + Sair ───────────────────────────────────────────────── */}
+        <div className="px-4 py-4 border-t border-white/8 flex-shrink-0">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[11px] text-brand-200 font-mono flex-shrink-0 uppercase">
+              {cpf.replace(/\D/g, '').slice(0, 2)}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-mono text-slate-300 truncate">{cpf}</p>
-              <p className="text-[10px] text-slate-500">{session.user.user_metadata?.papel ?? 'Usuário'}</p>
+              <p className="text-[10px] text-slate-500 truncate">{papel}</p>
             </div>
           </div>
           <button
             onClick={() => supabase.auth.signOut()}
-            className="btn w-full justify-center text-xs py-1.5 text-slate-400"
+            className="btn w-full justify-center text-xs py-1.5 text-slate-400 hover:text-red-400 hover:border-red-500/30"
           >
             Sair
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        {page === 'tree'   && <OrgTreePage session={session} />}
-        {page === 'kanban' && <KanbanPage  session={session} />}
+      {/* ── Conteúdo principal ────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-auto min-w-0">
+        {page === 'dashboard' && <DashboardPage session={session} />}
+        {page === 'metas'     && <MetasPage     session={session} />}
+        {page === 'kanban'    && <KanbanPage    session={session} />}
+        {page === 'tree'      && <OrgTreePage   session={session} />}
       </main>
     </div>
   )
