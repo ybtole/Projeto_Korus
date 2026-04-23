@@ -20,12 +20,13 @@ export function useLancamentos(filtros = {}) {
 
     if (filtros.setor_id) query = query.eq('metas.setor_id', filtros.setor_id)
     if (filtros.mes)      query = query.eq('mes_referencia', filtros.mes)
+    if (filtros.ano && !filtros.mes) query = query.like('mes_referencia', `${filtros.ano}-%`)
 
     const { data, error } = await query
     if (error) setErro(error.message)
     else { setLancamentos(data ?? []); setErro(null) }
     setLoading(false)
-  }, [filtros.setor_id, filtros.mes])
+  }, [filtros.setor_id, filtros.mes, filtros.ano])
 
   useEffect(() => { fetch() }, [fetch])
 

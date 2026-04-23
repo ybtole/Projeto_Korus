@@ -7,17 +7,27 @@ import KanbanBoard from '../components/kanban/KanbanBoard'
 import CardModal from '../components/kanban/CardModal'
 import Modal from '../components/shared/Modal'
 
-const MESES = ['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
-               '2025-07','2025-08','2025-09','2025-10','2025-11','2025-12']
-const MES_LABELS = {
-  '2025-01':'Jan/25','2025-02':'Fev/25','2025-03':'Mar/25','2025-04':'Abr/25',
-  '2025-05':'Mai/25','2025-06':'Jun/25','2025-07':'Jul/25','2025-08':'Ago/25',
-  '2025-09':'Set/25','2025-10':'Out/25','2025-11':'Nov/25','2025-12':'Dez/25',
+const ANO_INICIO = 2024
+
+const NOMES_MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+
+function gerarMeses(ano) {
+  return Array.from({ length: 12 }, (_, i) => {
+    const m = String(i + 1).padStart(2, '0')
+    return { value: `${ano}-${m}`, label: `${NOMES_MESES[i]}/${String(ano).slice(2)}` }
+  })
 }
 
 export default function KanbanPage({ session }) {
+  const anoAtual = new Date().getFullYear()
+  const anosDisponiveis = Array.from(
+    { length: anoAtual - ANO_INICIO + 1 },
+    (_, i) => ANO_INICIO + i
+  )
+
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroMes, setFiltroMes] = useState('')
+  const [filtroAno, setFiltroAno] = useState(String(anoAtual))
   const [activeId, setActiveId] = useState(null)
   const [cardModal, setCardModal] = useState(null)
   const [novoModal, setNovoModal] = useState(false)
@@ -25,9 +35,14 @@ export default function KanbanPage({ session }) {
   // Setor selecionado dentro do modal de novo lançamento (para filtrar metas)
   const [setorMeta, setSetorMeta] = useState('')
 
+  // Meses do ano selecionado no filtro (ou ano atual se "Todos")
+  const anoRef = filtroAno || String(anoAtual)
+  const mesesDoAno = gerarMeses(Number(anoRef))
+
   const { lancamentos, loading, erro, atualizarStatus, salvar, criar } = useLancamentos({
     setor_id: filtroSetor || undefined,
     mes: filtroMes || undefined,
+    ano: filtroAno || undefined,
   })
   const { setores } = useSetores()
   // Metas filtradas pelo setor escolhido no modal
@@ -75,6 +90,19 @@ export default function KanbanPage({ session }) {
     }
   }
 
+  function handleSetFiltroAno(ano) {
+    setFiltroAno(ano)
+    setFiltroMes('') // reseta mês ao trocar o ano para evitar valor inválido
+  }
+
+  function limparFiltros() {
+    setFiltroSetor('')
+    setFiltroMes('')
+    setFiltroAno('')
+  }
+
+  const temFiltroAtivo = filtroSetor || filtroMes || filtroAno
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -92,36 +120,67 @@ export default function KanbanPage({ session }) {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="px-6 py-3 border-b border-white/5 flex items-center gap-3 flex-shrink-0 flex-wrap">
-        <span className="text-xs text-slate-500 uppercase tracking-wider">Filtros</span>
+      {/* Filtros */}
+      <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
+        <div className="flex items-end gap-5 flex-wrap">
 
-        <select
-          className="input w-auto text-xs py-1.5 px-2"
-          value={filtroSetor}
-          onChange={e => setFiltroSetor(e.target.value)}
-        >
-          <option value="">Todos os setores</option>
-          {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-        </select>
+          {/* Filtro: Setores */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Setores
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroSetor}
+              onChange={e => setFiltroSetor(e.target.value)}
+            >
+              <option value="">Todos os setores</option>
+              {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
+          </div>
 
-        <select
-          className="input w-auto text-xs py-1.5 px-2"
-          value={filtroMes}
-          onChange={e => setFiltroMes(e.target.value)}
-        >
-          <option value="">Todos os meses</option>
-          {MESES.map(m => <option key={m} value={m}>{MES_LABELS[m]}</option>)}
-        </select>
+          {/* Filtro: Mês */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Mês
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroMes}
+              onChange={e => setFiltroMes(e.target.value)}
+            >
+              <option value="">Todos os meses</option>
+              {mesesDoAno.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
 
-        {(filtroSetor || filtroMes) && (
-          <button
-            className="btn text-xs py-1.5 text-slate-400"
-            onClick={() => { setFiltroSetor(''); setFiltroMes('') }}
-          >
-            Limpar
-          </button>
-        )}
+          {/* Filtro: Ano */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+              Ano
+            </span>
+            <select
+              className="input w-auto text-xs py-1.5 px-2"
+              value={filtroAno}
+              onChange={e => handleSetFiltroAno(e.target.value)}
+            >
+              <option value="">Todos os anos</option>
+              {anosDisponiveis.map(ano => (
+                <option key={ano} value={String(ano)}>{ano}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Limpar filtros */}
+          {temFiltroAtivo && (
+            <button
+              className="btn text-xs py-1.5 text-slate-400 self-end"
+              onClick={limparFiltros}
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Board */}
@@ -207,6 +266,7 @@ export default function KanbanPage({ session }) {
                 <p className="text-xs text-amber-500 mt-1">Nenhuma meta encontrada para este setor.</p>
               )}
             </div>
+
             <div>
               <label className="label">Mês de referência</label>
               <select
@@ -216,9 +276,12 @@ export default function KanbanPage({ session }) {
                 required
               >
                 <option value="">Selecione...</option>
-                {MESES.map(m => <option key={m} value={m}>{MES_LABELS[m]}</option>)}
+                {gerarMeses(anoAtual).map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
               </select>
             </div>
+
             <div>
               <label className="label">Valor inicial (opcional)</label>
               <input
