@@ -67,7 +67,7 @@ export default function OrgTreePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-hidden p-4">
         {loading && (
           <div className="flex items-center justify-center h-40 gap-2 text-slate-500">
             <div className="w-4 h-4 border border-brand-500 border-t-transparent rounded-full animate-spin" />
