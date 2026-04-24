@@ -22,10 +22,34 @@ export function useLancamentos(filtros = {}) {
     if (filtros.mes)      query = query.eq('mes_referencia', filtros.mes)
 
     const { data, error } = await query
-    if (error) setErro(error.message)
-    else { setLancamentos(data ?? []); setErro(null) }
+    if (error) {
+      setErro(error.message)
+    } else {
+      let resultado = data ?? []
+
+      if (filtros.setor_ids?.length > 0) {
+        resultado = resultado.filter(l =>
+          filtros.setor_ids.includes(l.metas?.setor_id)
+        )
+      }
+
+      if (filtros.meta_ids?.length > 0) {
+        resultado = resultado.filter(l =>
+          filtros.meta_ids.includes(l.meta_id)
+        )
+      }
+
+      setLancamentos(resultado)
+      setErro(null)
+    }
     setLoading(false)
-  }, [filtros.setor_id, filtros.mes])
+  }, [
+    filtros.setor_id,
+    filtros.mes,
+    filtros.ano,
+    JSON.stringify(filtros.setor_ids),
+    JSON.stringify(filtros.meta_ids),
+  ])
 
   useEffect(() => { fetch() }, [fetch])
 
