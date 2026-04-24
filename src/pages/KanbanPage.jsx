@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useLancamentos } from '../hooks/useLancamentos'
 import { useSetores } from '../hooks/useSetores'
 import { useMetas } from '../hooks/useMetas'
+import { usePerfil } from '../hooks/usePerfil'
 import KanbanBoard from '../components/kanban/KanbanBoard'
 import CardModal from '../components/kanban/CardModal'
 import Modal from '../components/shared/Modal'
@@ -35,18 +36,33 @@ export default function KanbanPage({ session }) {
   // Setor selecionado dentro do modal de novo lançamento (para filtrar metas)
   const [setorMeta, setSetorMeta] = useState('')
 
+  const {
+    papel,
+    setorIds,
+    metasPermitidas,
+    isAC,
+    isLM,
+    podeVerERP,
+  } = usePerfil(session)
+
   // Meses do ano selecionado no filtro (ou ano atual se "Todos")
   const anoRef = filtroAno || String(anoAtual)
   const mesesDoAno = gerarMeses(Number(anoRef))
 
   const { lancamentos, loading, erro, atualizarStatus, salvar, criar } = useLancamentos({
-    setor_id: filtroSetor || undefined,
+    setor_id: isAC ? (filtroSetor || undefined) : undefined,
+    setor_ids: !isAC && setorIds.length > 0 ? setorIds : undefined,
+    meta_ids: isLM && metasPermitidas ? metasPermitidas : undefined,
     mes: filtroMes || undefined,
     ano: filtroAno || undefined,
   })
   const { setores } = useSetores()
   // Metas filtradas pelo setor escolhido no modal
-  const { metas, loading: loadingMetas } = useMetas(setorMeta || null)
+  const { metas: metasDisponiveis, loading: loadingMetas } = useMetas(
+    setorMeta || null,
+    null,
+    isLM && metasPermitidas ? metasPermitidas : null
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -68,6 +84,15 @@ export default function KanbanPage({ session }) {
       console.error(e)
     }
   }, [lancamentos, atualizarStatus])
+
+  useEffect(() => {
+    if (isAC) return
+    if (setorIds.length === 1) {
+      setFiltroSetor(setorIds[0])
+    }
+    // Se tiver múltiplos setores, não força um específico —
+    // o filtro por setor_ids no hook cuidará disso
+  }, [isAC, JSON.stringify(setorIds)])
 
   async function handleSaveCard(id, payload) {
     await salvar(id, payload)
@@ -103,6 +128,26 @@ export default function KanbanPage({ session }) {
 
   const temFiltroAtivo = filtroSetor || filtroMes || filtroAno
 
+  // Usuário comum não tem acesso ao Kanban
+  if (papel === 'Usuário' && !isAC) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="card p-8 max-w-sm w-full text-center">
+          <div className="w-12 h-12 rounded-full bg-red-900/30 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v4m0 4h.01"/>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+          </div>
+          <h2 className="text-sm font-semibold text-white mb-1">Acesso Restrito</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Você não tem permissão para acessar os lançamentos.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -115,17 +160,20 @@ export default function KanbanPage({ session }) {
             <span className="text-green-400">● Realtime ativo</span>
           </p>
         </div>
-        <button onClick={() => setNovoModal(true)} className="btn-primary">
-          + Novo lançamento
-        </button>
+        {papel !== 'Usuário' && (
+          <button onClick={() => setNovoModal(true)} className="btn-primary">
+            + Novo lançamento
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
       <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
         <div className="flex items-end gap-5 flex-wrap">
 
-          {/* Filtro: Setores */}
+          {isAC && (
           <div className="flex flex-col gap-1.5">
+            {/* Filtro: Setores */}
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
               Setores
             </span>
@@ -138,6 +186,7 @@ export default function KanbanPage({ session }) {
               {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
             </select>
           </div>
+          )}
 
           {/* Filtro: Mês */}
           <div className="flex flex-col gap-1.5">
@@ -225,7 +274,8 @@ export default function KanbanPage({ session }) {
       {novoModal && (
         <Modal title="Novo Lançamento" onClose={() => setNovoModal(false)}>
           <form onSubmit={handleCriar} className="flex flex-col gap-4">
-            {/* 1. Filtro de setor para restringir a lista de metas */}
+            {/* 1. Filtro de setor para restringir a lista de metas — oculto para L.M pois suas metas já são pré-filtradas */}
+            {!isLM && (
             <div>
               <label className="label">Setor</label>
               <select
@@ -242,6 +292,7 @@ export default function KanbanPage({ session }) {
                 ))}
               </select>
             </div>
+            )}
 
             {/* 2. Select de meta filtrado pelo setor */}
             <div>
@@ -256,13 +307,13 @@ export default function KanbanPage({ session }) {
                 <option value="">
                   {loadingMetas ? 'Carregando metas…' : 'Selecione uma meta'}
                 </option>
-                {metas.map(m => (
+                {metasDisponiveis.map(m => (
                   <option key={m.id} value={m.id}>
                     {m.nome}{m.unidade ? ` (${m.unidade})` : ''}
                   </option>
                 ))}
               </select>
-              {!loadingMetas && metas.length === 0 && setorMeta && (
+              {!loadingMetas && metasDisponiveis.length === 0 && setorMeta && (
                 <p className="text-xs text-amber-500 mt-1">Nenhuma meta encontrada para este setor.</p>
               )}
             </div>

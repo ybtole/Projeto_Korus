@@ -7,6 +7,17 @@ import MetasPage      from './MetasPage'
 import DashboardPage  from './DashboardPage'
 import ERPPage        from './ERPPage'
 
+// ─── Cores dos badges de papel ────────────────────────────────────────────────
+
+const PAPEL_BADGE_COLORS = {
+  'A.C':     'bg-amber-900/50 text-amber-300 border-amber-500/30',
+  'T.I':     'bg-cyan-900/50 text-cyan-300 border-cyan-500/30',
+  'R.A':     'bg-purple-900/50 text-purple-300 border-purple-500/30',
+  'R.M':     'bg-blue-900/50 text-blue-300 border-blue-500/30',
+  'L.M':     'bg-green-900/50 text-green-300 border-green-500/30',
+  'Usuário': 'bg-slate-800 text-slate-400 border-white/10',
+}
+
 // ─── Navegação ────────────────────────────────────────────────────────────────
 
 const NAV = [
@@ -122,6 +133,18 @@ export default function MainLayout({ session }) {
   const cpf   = session.user.email?.replace('@aguia.com', '') ?? '—'
   const papel = session.user.user_metadata?.papel ?? 'Usuário'
 
+  // ── Redirecionamento para páginas restritas ─────────────────────────────────
+  useEffect(() => {
+    const paginasRestritas = {
+      erp: ['A.C', 'T.I'],
+    }
+
+    const restricao = paginasRestritas[page]
+    if (restricao && !restricao.includes(papel)) {
+      setPage('dashboard')
+    }
+  }, [page, papel])
+
   // ── Badges: contar lançamentos aguardando aprovação ─────────────────────────
   const fetchBadges = useCallback(async () => {
     const { count } = await supabase
@@ -209,9 +232,13 @@ export default function MainLayout({ session }) {
             <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[11px] text-brand-200 font-mono flex-shrink-0 uppercase">
               {cpf.replace(/\D/g, '').slice(0, 2)}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-mono text-slate-300 truncate">{cpf}</p>
-              <p className="text-[10px] text-slate-500 truncate">{papel}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[papel] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                  {papel}
+                </span>
+              </div>
             </div>
           </div>
           <button

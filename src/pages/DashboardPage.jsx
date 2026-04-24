@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSetores } from '../hooks/useSetores'
+import { usePerfil } from '../hooks/usePerfil'
 import { useConnectionStatus } from '../hooks/useRealtimeSync'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -357,7 +358,7 @@ function AlertaRow({ lancamento, meta, tipo }) {
 }
 
 // ── FilterBar — barra de filtros com labels, setor, semestre e ano ─────────────
-function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, setores }) {
+function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, setores, podeVerTodosSetores }) {
   const anos = getAnosDisponiveis()
 
   // Estilo compartilhado para os selects
@@ -407,8 +408,9 @@ function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, se
       {/* Separador */}
       <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
 
-      {/* Filtro: Setor */}
+      {podeVerTodosSetores && (
       <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {/* Filtro: Setor */}
         <span style={labelStyle}>Setor</span>
         <select
           value={setorId}
@@ -421,6 +423,7 @@ function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, se
           ))}
         </select>
       </div>
+      )}
 
       {/* Filtro: Semestre */}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -453,7 +456,7 @@ function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, se
 }
 
 // ─── Aba Geral ────────────────────────────────────────────────────────────────
-function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, setAno, setorId, setSetorId }) {
+function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, setAno, setorId, setSetorId, isAC }) {
   const aprovados = lancamentos.filter(l => l.status === 'APROVADO').length
   const total = lancamentos.length
   const emAndamento = lancamentos.filter(l => l.status === 'EM_ANDAMENTO').length
@@ -503,6 +506,7 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
         setorId={setorId}
         setSetorId={setSetorId}
         setores={setores}
+        podeVerTodosSetores={isAC}
       />
 
       {/* Stats grid */}
@@ -917,7 +921,7 @@ function AbaAnalise({ lancamentos, metas, setores }) {
 }
 
 // ─── Dashboard Principal ──────────────────────────────────────────────────────
-export default function DashboardPage() {
+export default function DashboardPage({ session }) {
   const [aba, setAba] = useState('geral')
   const [lancamentosRaw, setLancamentosRaw] = useState([])
   const [metasRaw, setMetasRaw] = useState([])
@@ -928,6 +932,20 @@ export default function DashboardPage() {
   const [lastUpdate, setLastUpdate] = useState('—')
   const { setores } = useSetores()
   const connStatus = useConnectionStatus()
+  const {
+    papel,
+    setorIds,
+    metasPermitidas,
+    isAC,
+    isLM,
+  } = usePerfil(session)
+
+  useEffect(() => {
+    if (isAC) return
+    if (setorIds.length === 1) {
+      setSetorId(setorIds[0])
+    }
+  }, [isAC, JSON.stringify(setorIds)])
 
   // Meses do semestre/ano selecionados
   const mesesSemestre = getMesesSemestre(semestre, ano)
@@ -960,19 +978,30 @@ export default function DashboardPage() {
     return () => supabase.removeChannel(channel)
   }, [fetchData])
 
-  // ── Filtro local por setor ──────────────────────────────────────────────────
-  // Aplica o filtro de setor sobre os dados crus, sem nova requisição ao banco.
-  // O setor_id da meta está em meta.setor_id (campo da tabela) OU em
-  // lancamento.metas.setor_id (join). Usamos metasRaw como fonte de verdade.
-  const metasFiltradas = setorId
-    ? metasRaw.filter(m => String(m.setor_id) === String(setorId))
-    : metasRaw
+  // ── Filtro local por papel e setor ─────────────────────────────────────────
+  // A.C vê tudo e pode filtrar por setor via select. Demais papéis são restritos.
+  const metasFiltradas = (() => {
+    if (isAC) {
+      return setorId
+        ? metasRaw.filter(m => String(m.setor_id) === String(setorId))
+        : metasRaw
+    }
+    if (isLM && metasPermitidas !== null) {
+      return metasRaw.filter(m => metasPermitidas.includes(m.id))
+    }
+    return metasRaw.filter(m => setorIds.includes(m.setor_id))
+  })()
 
   const metaIdsFiltrados = new Set(metasFiltradas.map(m => m.id))
 
-  const lancamentosFiltrados = setorId
-    ? lancamentosRaw.filter(l => metaIdsFiltrados.has(l.meta_id))
-    : lancamentosRaw
+  const lancamentosFiltrados = lancamentosRaw.filter(l =>
+    metaIdsFiltrados.has(l.meta_id)
+  )
+
+  // Setores visíveis dependem do papel
+  const setoresFiltrados = isAC
+    ? setores
+    : setores.filter(s => setorIds.includes(s.id))
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1e30', fontFamily: 'IBM Plex Sans, sans-serif' }}>
@@ -1041,13 +1070,14 @@ export default function DashboardPage() {
               <AbaGeral
                 lancamentos={lancamentosFiltrados}
                 metas={metasFiltradas}
-                setores={setores}
+                setores={setoresFiltrados}
                 semestre={semestre}
                 setSemestre={setSemestre}
                 ano={ano}
                 setAno={setAno}
                 setorId={setorId}
                 setSetorId={setSetorId}
+                isAC={isAC}
               />
             )}
             {aba === 'ao_vivo' && (
@@ -1067,7 +1097,7 @@ export default function DashboardPage() {
               <AbaAnalise
                 lancamentos={lancamentosFiltrados}
                 metas={metasFiltradas}
-                setores={setores}
+                setores={setoresFiltrados}
               />
             )}
           </>

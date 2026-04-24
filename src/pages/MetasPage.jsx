@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSetores } from '../hooks/useSetores'
+import { usePerfil } from '../hooks/usePerfil'
 import Modal from '../components/shared/Modal'
 
 const ANO_INICIO = 2024
@@ -296,7 +297,7 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   )
 }
 
-function MetaCard({ meta, onEdit, onDelete, onToggleAtivo }) {
+function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir }) {
   const pct = meta.peso ? `${meta.peso}%` : '—'
   const isAtiva = meta.ativa !== false
 
@@ -320,11 +321,17 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo }) {
           <p className="text-xs text-slate-500 mt-0.5">{meta.setores?.nome ?? '—'}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs">✎</button>
-          <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400">
-            {isAtiva ? '⏸' : '▶'}
-          </button>
-          <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs">✕</button>
+          {podeEditar && (
+            <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs">✎</button>
+          )}
+          {podeEditar && (
+            <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400">
+              {isAtiva ? '⏸' : '▶'}
+            </button>
+          )}
+          {podeExcluir && (
+            <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs">✕</button>
+          )}
         </div>
       </div>
 
@@ -359,7 +366,7 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo }) {
   )
 }
 
-export default function MetasPage() {
+export default function MetasPage({ session }) {
   const anoAtual = new Date().getFullYear()
   const anosDisponiveis = Array.from(
     { length: anoAtual - ANO_INICIO + 1 },
@@ -374,6 +381,7 @@ export default function MetasPage() {
   const [filtroSemestre, setFiltroSemestre] = useState('')
   const [filtroAno, setFiltroAno] = useState(String(anoAtual))
   const { setores } = useSetores()
+  const { papel, setorIds, metasPermitidas, isAC, isLM, podeCriarMeta } = usePerfil(session)
 
   const fetchMetas = useCallback(async () => {
     setLoading(true)
@@ -386,11 +394,25 @@ export default function MetasPage() {
     if (filtroSemestre) query = query.eq('semestre', filtroSemestre)
     if (filtroAno) query = query.eq('ano', Number(filtroAno))
 
+    if (!isAC) {
+      if (metasPermitidas !== null) {
+        if (metasPermitidas.length > 0) {
+          query = query.in('id', metasPermitidas)
+        } else {
+          setMetas([])
+          setLoading(false)
+          return
+        }
+      } else if (setorIds.length > 0) {
+        query = query.in('setor_id', setorIds)
+      }
+    }
+
     const { data, error } = await query
     if (error) setErro(error.message)
     else setMetas(data ?? [])
     setLoading(false)
-  }, [filtroSetor, filtroSemestre, filtroAno])
+  }, [filtroSetor, filtroSemestre, filtroAno, isAC, JSON.stringify(setorIds), JSON.stringify(metasPermitidas)])
 
   useEffect(() => {
     fetchMetas()
@@ -441,6 +463,11 @@ export default function MetasPage() {
     setFiltroAno('')
   }
 
+  function abrirModalCriar() {
+    if (!podeCriarMeta) return
+    setModal({ modo: 'criar' })
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -457,17 +484,20 @@ export default function MetasPage() {
             )}
           </p>
         </div>
-        <button onClick={() => setModal({ modo: 'criar' })} className="btn-primary">
-          + Nova meta
-        </button>
+        {podeCriarMeta && (
+          <button onClick={abrirModalCriar} className="btn-primary">
+            + Nova meta
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
       <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
         <div className="flex items-end gap-5 flex-wrap">
 
-          {/* Filtro: Setores */}
+          {isAC && (
           <div className="flex flex-col gap-1.5">
+            {/* Filtro: Setores */}
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
               Setores
             </span>
@@ -480,6 +510,7 @@ export default function MetasPage() {
               {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
             </select>
           </div>
+          )}
 
           {/* Filtro: Semestre */}
           <div className="flex flex-col gap-1.5">
@@ -540,9 +571,11 @@ export default function MetasPage() {
           <div className="flex flex-col items-center justify-center h-64 text-slate-500 gap-3">
             <div className="text-4xl opacity-20">🎯</div>
             <p className="text-sm">Nenhuma meta cadastrada.</p>
-            <button onClick={() => setModal({ modo: 'criar' })} className="btn-primary text-sm">
-              Criar primeira meta
-            </button>
+            {podeCriarMeta && (
+              <button onClick={abrirModalCriar} className="btn-primary text-sm">
+                Criar primeira meta
+              </button>
+            )}
           </div>
         )}
         {!loading && !erro && Object.entries(porSetor).map(([setor, metasDoSetor]) => (
@@ -562,6 +595,8 @@ export default function MetasPage() {
                   onEdit={meta => setModal({ modo: 'editar', meta })}
                   onDelete={handleDelete}
                   onToggleAtivo={handleToggleAtivo}
+                  podeEditar={isAC || papel === 'R.A' || papel === 'R.M'}
+                  podeExcluir={isAC}
                 />
               ))}
             </div>

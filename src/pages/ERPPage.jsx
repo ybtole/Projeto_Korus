@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAdminUsuarios } from '../hooks/useAdminUsuarios'
 import { useResponsabilidades } from '../hooks/useResponsabilidades'
 import Modal from '../components/shared/Modal'
+import { usePerfil } from '../hooks/usePerfil'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ function AcessoNegado() {
 
 function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabilidades, onDelete, onClose }) {
   const isTI = papel === 'T.I'
+  const isAC = papel === 'A.C'
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -116,8 +118,8 @@ function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabil
           Mudar cargo
         </button>
 
-        {/* Responsabilidades — apenas T.I */}
-        {isTI && (
+        {/* Responsabilidades — visível para T.I e A.C */}
+        {(isTI || isAC) && (
           <button onClick={() => { onResponsabilidades(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -453,6 +455,7 @@ function ConfirmarRemocaoModal({ usuario, onConfirmar, onClose }) {
 
 export default function ERPPage({ session }) {
   const papel = session?.user?.user_metadata?.papel
+  const { isAC, isTI: isTIPerfil, setorIds } = usePerfil(session)
   const podeAcessar = papel === 'A.C' || papel === 'T.I'
 
   const { usuarios, loading, erro, listar, criar, remover } = useAdminUsuarios()
@@ -522,7 +525,12 @@ export default function ERPPage({ session }) {
           <p className="text-xs text-slate-500 mt-0.5 font-mono">
             {loading ? 'Carregando...' : `${usuarios.length} usuário${usuarios.length !== 1 ? 's' : ''} no sistema`}
             &nbsp;·&nbsp;
-            <span className="text-slate-600">Clique com botão direito para ações</span>
+            <span className="text-slate-600">
+              {papel === 'T.I'
+                ? 'Clique com botão direito para ações'
+                : 'Clique com botão direito para gerenciar responsabilidades'
+              }
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
