@@ -54,9 +54,13 @@ function AcessoNegado() {
 
 // ── Menu de Contexto ──────────────────────────────────────────────────────────
 
-function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabilidades, onDelete, onClose }) {
+function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onResponsabilidades, onDelete, onClose }) {
   const isTI = papel === 'T.I'
   const isAC = papel === 'A.C'
+  const isRA = papel === 'R.A'
+  const isRM = papel === 'R.M'
+  const canManage = isTI || isAC
+  const canAssign = canManage || isRA || isRM
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -83,7 +87,7 @@ function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabil
   const cpf = usuario.email?.replace('@aguia.com', '') ?? usuario.email
 
   return (
-    <div ref={menuRef} style={style}
+    <div ref={menuRef}
       className="w-52 rounded-lg border border-white/10 shadow-2xl overflow-hidden"
       style={{ ...style, background: 'rgb(18 24 38)', backdropFilter: 'blur(12px)' }}
     >
@@ -98,8 +102,8 @@ function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabil
       {/* Ações */}
       <div className="py-1">
 
-        {/* Editar nome — apenas T.I */}
-        {isTI && (
+        {/* Editar nome — apenas T.I e não em si mesmo */}
+        {!isMe && isTI && (
           <button onClick={() => { onEdit(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -109,17 +113,19 @@ function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabil
           </button>
         )}
 
-        {/* Mudar cargo — todos */}
-        <button onClick={() => { onChangeRole(usuario); onClose() }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
-          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-          </svg>
-          Mudar cargo
-        </button>
+        {/* Mudar cargo — gerentes, exceto em si mesmo */}
+        {!isMe && canManage && (
+          <button onClick={() => { onChangeRole(usuario); onClose() }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+            Mudar cargo
+          </button>
+        )}
 
-        {/* Responsabilidades — visível para T.I e A.C */}
-        {(isTI || isAC) && (
+        {/* Responsabilidades — visível para T.I, A.C, R.A e R.M (pode ver si mesmo) */}
+        {canAssign && (
           <button onClick={() => { onResponsabilidades(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -129,8 +135,8 @@ function ContextMenu({ x, y, usuario, papel, onEdit, onChangeRole, onResponsabil
           </button>
         )}
 
-        {/* Remover — apenas T.I */}
-        {isTI && (
+        {/* Remover — apenas T.I e não a si mesmo */}
+        {!isMe && isTI && (
           <>
             <div className="mx-2 my-1 h-px bg-white/8" />
             <button onClick={() => { onDelete(usuario); onClose() }}
@@ -256,7 +262,7 @@ function EditarNomeModal({ usuario, onSalvar, onClose }) {
 
 // ── Modal: Mudar Cargo ────────────────────────────────────────────────────────
 
-function MudarCargoModal({ usuario, onSalvar, onClose }) {
+function MudarCargoModal({ usuario, onSalvar, onClose, currentUserRole }) {
   const cpf = usuario.email?.replace('@aguia.com', '') ?? ''
   const [papel, setPapel] = useState(usuario.papel ?? '')
   const [salvando, setSalvando] = useState(false)
@@ -285,7 +291,7 @@ function MudarCargoModal({ usuario, onSalvar, onClose }) {
           <label className="label">Novo Cargo</label>
           <select value={papel} onChange={e => setPapel(e.target.value)} className="input">
             <option value="">Selecione...</option>
-            {PAPEIS.map(p => <option key={p} value={p}>{p} — {PAPEL_LABELS[p]}</option>)}
+            {(currentUserRole === 'T.I' ? PAPEIS : PAPEIS.filter(p => p !== 'T.I')).map(p => <option key={p} value={p}>{p} — {PAPEL_LABELS[p]}</option>)}
           </select>
         </div>
         {erro && <p className="text-xs text-red-400 bg-red-900/20 border border-red-500/20 rounded px-3 py-2">{erro}</p>}
@@ -302,7 +308,7 @@ function MudarCargoModal({ usuario, onSalvar, onClose }) {
 
 // ── Modal: Responsabilidades do Usuário ────────────────────────────────────────
 
-function ResponsabilidadesModal({ usuario, onClose }) {
+function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUserSetorIds }) {
   const cpf = usuario.email?.replace('@aguia.com', '') ?? ''
   const { responsabilidades, setores, loading, adicionar, remover } = useResponsabilidades()
   const [form, setForm] = useState({ setor_id: '', papel: '' })
@@ -312,7 +318,14 @@ function ResponsabilidadesModal({ usuario, onClose }) {
 
   const minhasResponsabilidades = responsabilidades.filter(r => r.user_id === usuario.id || r.usuarios?.id === usuario.id)
 
-  const PAPEIS_RESP = ['R.A', 'R.M', 'L.M']
+  const PAPEIS_RESP = currentUserRole === 'T.I' || currentUserRole === 'A.C'
+    ? ['R.A', 'R.M', 'L.M']
+    : currentUserRole === 'R.A' ? ['R.M', 'L.M'] : ['L.M']
+
+  const setoresFiltrados = currentUserRole === 'T.I' || currentUserRole === 'A.C'
+    ? setores
+    : setores.filter(s => currentUserSetorIds.includes(s.id))
+
   const PAPEL_COLORS_RESP = {
     'R.A': 'bg-purple-900/50 text-purple-300 border-purple-500/30',
     'R.M': 'bg-blue-900/50 text-blue-300 border-blue-500/30',
@@ -390,7 +403,7 @@ function ResponsabilidadesModal({ usuario, onClose }) {
             <div className="flex-1 min-w-32">
               <select value={form.setor_id} onChange={e => setForm(p => ({ ...p, setor_id: e.target.value }))} className="input text-xs py-1.5">
                 <option value="">Setor...</option>
-                {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                {setoresFiltrados.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
             </div>
             <div className="w-28">
@@ -455,10 +468,10 @@ function ConfirmarRemocaoModal({ usuario, onConfirmar, onClose }) {
 
 export default function ERPPage({ session }) {
   const papel = session?.user?.user_metadata?.papel
-  const { isAC, isTI: isTIPerfil, setorIds } = usePerfil(session)
-  const podeAcessar = papel === 'A.C' || papel === 'T.I'
+  const { isAC, isTI: isTIPerfil, isRA, isRM, setorIds, podeVerERP } = usePerfil(session)
 
   const { usuarios, loading, erro, listar, criar, remover } = useAdminUsuarios()
+  const { responsabilidades, loading: loadingResp } = useResponsabilidades()
   const [busca, setBusca] = useState('')
   const [modalCriar, setModalCriar] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
@@ -509,11 +522,23 @@ export default function ERPPage({ session }) {
   }
 
   const usuariosFiltrados = usuarios.filter(u => {
+    // Esconder T.I se não for T.I
+    if (papel !== 'T.I' && u.papel === 'T.I') return false
+
+    // Se for R.A ou R.M, filtra apenas usuários que tenham alguma responsabilidade em comum no setor
+    if (isRA || isRM) {
+      const userResps = responsabilidades.filter(r => r.usuarios?.id === u.id || r.user_id === u.id)
+      const isInMySector = userResps.some(r => setorIds.includes(r.setores?.id || r.setor_id))
+      // Se não estiver em nenhum dos setores do R.A/R.M, esconde.
+      // E também mostra a si mesmo
+      if (!isInMySector && u.id !== session?.user?.id) return false
+    }
+
     const q = busca.toLowerCase()
     return !q || u.email?.toLowerCase().includes(q) || u.papel?.toLowerCase().includes(q) || u.nome?.toLowerCase().includes(q)
   })
 
-  if (!podeAcessar) return <AcessoNegado />
+  if (!podeVerERP) return <AcessoNegado />
 
   return (
     <div className="p-6 max-w-5xl mx-auto" onContextMenu={e => e.preventDefault()}>
@@ -523,10 +548,10 @@ export default function ERPPage({ session }) {
         <div>
           <h1 className="text-lg font-semibold text-white">Módulo ERP</h1>
           <p className="text-xs text-slate-500 mt-0.5 font-mono">
-            {loading ? 'Carregando...' : `${usuarios.length} usuário${usuarios.length !== 1 ? 's' : ''} no sistema`}
+            {loading || loadingResp ? 'Carregando...' : `${usuariosFiltrados.length} usuário${usuariosFiltrados.length !== 1 ? 's' : ''} encontrados`}
             &nbsp;·&nbsp;
             <span className="text-slate-600">
-              {papel === 'T.I'
+              {isTIPerfil || isAC
                 ? 'Clique com botão direito para ações'
                 : 'Clique com botão direito para gerenciar responsabilidades'
               }
@@ -573,7 +598,7 @@ export default function ERPPage({ session }) {
 
         {/* Header */}
         <div className="grid gap-4 px-5 py-3 border-b border-white/8 text-[10px] uppercase tracking-wider text-slate-500 font-medium"
-          style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr 1fr' }}>
+          style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr 1.2fr' }}>
           <span>CPF / Login</span>
           <span>Nome</span>
           <span>Cargo</span>
@@ -601,7 +626,7 @@ export default function ERPPage({ session }) {
                 key={u.id}
                 onContextMenu={(e) => handleContextMenu(e, u)}
                 className="grid gap-4 px-5 py-3.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors items-center cursor-context-menu group"
-                style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr auto' }}
+                style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr 1.2fr' }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-brand-500/20 border border-brand-500/15 flex items-center justify-center text-[10px] text-brand-300 font-mono flex-shrink-0">
@@ -658,6 +683,7 @@ export default function ERPPage({ session }) {
           y={contextMenu.y}
           usuario={contextMenu.usuario}
           papel={papel}
+          isMe={session?.user?.id === contextMenu.usuario.id}
           onEdit={(u) => setModalEditar(u)}
           onChangeRole={(u) => setModalCargo(u)}
           onResponsabilidades={(u) => setModalResp(u)}
@@ -669,8 +695,8 @@ export default function ERPPage({ session }) {
       {/* ── Modais ─────────────────────────────────────────────────────────────── */}
       {modalCriar     && <CriarUsuarioModal onSalvar={criar} onClose={() => { setModalCriar(false); listar() }} />}
       {modalEditar    && <EditarNomeModal usuario={modalEditar} onSalvar={handleEditarNome} onClose={() => setModalEditar(null)} />}
-      {modalCargo     && <MudarCargoModal usuario={modalCargo} onSalvar={handleMudarCargo} onClose={() => setModalCargo(null)} />}
-      {modalResp      && <ResponsabilidadesModal usuario={modalResp} onClose={() => setModalResp(null)} />}
+      {modalCargo     && <MudarCargoModal usuario={modalCargo} onSalvar={handleMudarCargo} onClose={() => setModalCargo(null)} currentUserRole={papel} />}
+      {modalResp      && <ResponsabilidadesModal usuario={modalResp} onClose={() => setModalResp(null)} currentUserRole={papel} currentUserSetorIds={setorIds} />}
       {modalRemover   && <ConfirmarRemocaoModal usuario={modalRemover} onConfirmar={remover} onClose={() => setModalRemover(null)} />}
 
     </div>

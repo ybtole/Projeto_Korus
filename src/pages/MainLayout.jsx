@@ -79,7 +79,7 @@ const NAV = [
   {
     id: 'erp',
     label: 'ERP',
-    roles: ['A.C', 'T.I'],
+    roles: ['A.C', 'T.I', 'R.A', 'R.M'],
     icon: (
       <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -136,7 +136,7 @@ export default function MainLayout({ session }) {
   // ── Redirecionamento para páginas restritas ─────────────────────────────────
   useEffect(() => {
     const paginasRestritas = {
-      erp: ['A.C', 'T.I'],
+      erp: ['A.C', 'T.I', 'R.A', 'R.M'],
     }
 
     const restricao = paginasRestritas[page]

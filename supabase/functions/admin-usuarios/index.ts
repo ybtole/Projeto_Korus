@@ -41,8 +41,13 @@ Deno.serve(async (req) => {
   }
 
   const papel = user.user_metadata?.papel
-  if (papel !== 'T.I') {
-    return new Response(JSON.stringify({ error: 'Apenas T.I pode gerenciar usuários' }), {
+  const isTI = papel === 'T.I'
+  const isAC = papel === 'A.C'
+  const isRA = papel === 'R.A'
+  const isRM = papel === 'R.M'
+
+  if (!isTI && !isAC && !isRA && !isRM) {
+    return new Response(JSON.stringify({ error: 'Você não tem permissão para gerenciar usuários' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -56,7 +61,14 @@ Deno.serve(async (req) => {
   )
 
   const body = await req.json()
-  const { acao } = body // 'criar' | 'remover'
+  const { acao } = body // 'criar' | 'remover' | 'listar' | 'mudar_cargo' | 'editar_nome'
+
+  if (acao !== 'listar' && !isTI && !isAC) {
+    return new Response(JSON.stringify({ error: 'Você só tem permissão para visualizar os usuários' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
   // ── Criar usuário ────────────────────────────────────────────────────────────
   if (acao === 'criar') {

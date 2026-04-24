@@ -58,7 +58,7 @@ export function usePerfil(session) {
   const isRA = papel === 'R.A'
   const isRM = papel === 'R.M'
   const isLM = papel === 'L.M'
-  const podeVerERP    = isAC || isTI
+  const podeVerERP    = isAC || isTI || isRA || isRM
   const podeCriarMeta = isAC
   const podeAtribuir  = isAC || isRA || isRM
 
