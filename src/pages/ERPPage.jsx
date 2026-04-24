@@ -310,13 +310,19 @@ function MudarCargoModal({ usuario, onSalvar, onClose, currentUserRole }) {
 
 function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUserSetorIds }) {
   const cpf = usuario.email?.replace('@aguia.com', '') ?? ''
-  const { responsabilidades, setores, loading, adicionar, remover } = useResponsabilidades()
-  const [form, setForm] = useState({ setor_id: '', papel: '' })
+  const { responsabilidades, metasLm, setores, metas, loading, adicionar, remover } = useResponsabilidades()
+  const [form, setForm] = useState({ setor_id: '', papel: '', meta_id: '' })
   const [salvando, setSalvando] = useState(false)
   const [removendo, setRemovendo] = useState(null)
   const [erro, setErro] = useState(null)
 
   const minhasResponsabilidades = responsabilidades.filter(r => r.user_id === usuario.id || r.usuarios?.id === usuario.id)
+  const minhasMetasLm = metasLm?.filter(m => m.perfil_id === usuario.id) ?? []
+
+  const listaAtribuicoes = [
+    ...minhasResponsabilidades.map(r => ({ id: r.id, papel: r.papel, desc: r.setores?.nome ?? '—', isLm: false })),
+    ...minhasMetasLm.map(m => ({ id: m.id, papel: 'L.M', desc: `Meta: ${m.metas?.nome ?? '—'}`, isLm: true }))
+  ]
 
   const PAPEIS_RESP = currentUserRole === 'T.I' || currentUserRole === 'A.C'
     ? ['R.A', 'R.M', 'L.M']
@@ -326,6 +332,10 @@ function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUser
     ? setores
     : setores.filter(s => currentUserSetorIds.includes(s.id))
 
+  const metasFiltradas = currentUserRole === 'T.I' || currentUserRole === 'A.C'
+    ? metas
+    : metas.filter(m => currentUserSetorIds.includes(m.setor_id))
+
   const PAPEL_COLORS_RESP = {
     'R.A': 'bg-purple-900/50 text-purple-300 border-purple-500/30',
     'R.M': 'bg-blue-900/50 text-blue-300 border-blue-500/30',
@@ -334,18 +344,20 @@ function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUser
 
   const handleAdicionar = async (e) => {
     e.preventDefault(); setErro(null)
-    if (!form.setor_id || !form.papel) { setErro('Preencha setor e papel.'); return }
+    if (!form.papel) { setErro('Selecione um papel.'); return }
+    if (form.papel === 'L.M' && !form.meta_id) { setErro('Selecione uma meta.'); return }
+    if (form.papel !== 'L.M' && !form.setor_id) { setErro('Selecione um setor.'); return }
     setSalvando(true)
     try {
-      await adicionar({ user_id: usuario.id, setor_id: form.setor_id, papel: form.papel })
-      setForm({ setor_id: '', papel: '' })
+      await adicionar({ user_id: usuario.id, setor_id: form.setor_id, papel: form.papel, meta_id: form.meta_id })
+      setForm({ setor_id: '', papel: '', meta_id: '' })
     } catch (err) { setErro(err.message) }
     finally { setSalvando(false) }
   }
 
-  const handleRemover = async (id) => {
+  const handleRemover = async (id, isLm) => {
     setRemovendo(id)
-    try { await remover(id) }
+    try { await remover(id, isLm) }
     catch (err) { alert(err.message) }
     finally { setRemovendo(null) }
   }
@@ -373,17 +385,17 @@ function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUser
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mb-2">Atribuições atuais</p>
           {loading ? (
             <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>
-          ) : minhasResponsabilidades.length === 0 ? (
+          ) : listaAtribuicoes.length === 0 ? (
             <p className="text-xs text-slate-600 italic py-2">Nenhuma responsabilidade atribuída.</p>
           ) : (
             <div className="flex flex-col gap-1">
-              {minhasResponsabilidades.map(r => (
+              {listaAtribuicoes.map(r => (
                 <div key={r.id} className="flex items-center gap-2 px-3 py-2 rounded border border-white/5 bg-white/3 group">
                   <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex-shrink-0 ${PAPEL_COLORS_RESP[r.papel] ?? 'bg-slate-800 text-slate-400 border-white/10'}`}>
                     {r.papel}
                   </span>
-                  <span className="text-xs text-slate-300 flex-1 truncate">{r.setores?.nome ?? '—'}</span>
-                  <button onClick={() => handleRemover(r.id)} disabled={removendo === r.id}
+                  <span className="text-xs text-slate-300 flex-1 truncate">{r.desc}</span>
+                  <button onClick={() => handleRemover(r.id, r.isLm)} disabled={removendo === r.id}
                     className="btn-danger px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity" title="Remover">
                     {removendo === r.id
                       ? <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
@@ -401,13 +413,20 @@ function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUser
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mb-2">Adicionar responsabilidade</p>
           <form onSubmit={handleAdicionar} className="flex gap-2 items-end flex-wrap">
             <div className="flex-1 min-w-32">
-              <select value={form.setor_id} onChange={e => setForm(p => ({ ...p, setor_id: e.target.value }))} className="input text-xs py-1.5">
-                <option value="">Setor...</option>
-                {setoresFiltrados.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-              </select>
+              {form.papel === 'L.M' ? (
+                <select value={form.meta_id} onChange={e => setForm(p => ({ ...p, meta_id: e.target.value }))} className="input text-xs py-1.5">
+                  <option value="">Selecione a meta...</option>
+                  {metasFiltradas.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                </select>
+              ) : (
+                <select value={form.setor_id} onChange={e => setForm(p => ({ ...p, setor_id: e.target.value }))} className="input text-xs py-1.5" disabled={!form.papel}>
+                  <option value="">Selecione o setor...</option>
+                  {setoresFiltrados.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+              )}
             </div>
             <div className="w-28">
-              <select value={form.papel} onChange={e => setForm(p => ({ ...p, papel: e.target.value }))} className="input text-xs py-1.5">
+              <select value={form.papel} onChange={e => setForm(p => ({ ...p, papel: e.target.value, setor_id: '', meta_id: '' }))} className="input text-xs py-1.5">
                 <option value="">Papel...</option>
                 {PAPEIS_RESP.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
