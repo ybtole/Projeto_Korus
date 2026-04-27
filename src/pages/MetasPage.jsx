@@ -34,6 +34,14 @@ const EMPTY_FORM = {
   ano: String(new Date().getFullYear()),
   multiSetor: false,
   setores_adicionais: [],
+  tipo_calculo: 'MARGINAL',
+  config_booleano: { valor_sucesso: 'Concluído', valor_falha: 'Não Concluído' },
+  config_categorico: [
+    { categoria: 'A', percentual: 100 },
+    { categoria: 'B', percentual: 80 },
+    { categoria: 'C', percentual: 60 },
+    { categoria: 'D', percentual: 0 }
+  ],
   ranges: [
     { de: '', ate: '', percentual: 100 },
     { de: '', ate: '', percentual: 80 },
@@ -103,6 +111,56 @@ function RangeEditor({ ranges, onChange, direcao }) {
   )
 }
 
+function CategoricoEditor({ categorias, onChange }) {
+  function update(i, field, value) {
+    const next = categorias.map((c, idx) => idx === i ? { ...c, [field]: value } : c)
+    onChange(next)
+  }
+  function addCat() {
+    onChange([...categorias, { categoria: '', percentual: '' }])
+  }
+  function removeCat(i) {
+    onChange(categorias.filter((_, idx) => idx !== i))
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-12 gap-2 text-xs text-slate-500 uppercase tracking-wider px-1">
+        <span className="col-span-7">Categoria (Texto)</span>
+        <span className="col-span-4">PPR %</span>
+        <span className="col-span-1"></span>
+      </div>
+      {categorias.map((c, i) => (
+        <div key={i} className="grid grid-cols-12 gap-2 items-center">
+          <input
+            className="input py-1.5 text-sm col-span-7"
+            placeholder="Ex: A, B, Ótimo, Bom..."
+            value={c.categoria}
+            onChange={e => update(i, 'categoria', e.target.value)}
+          />
+          <div className="flex items-center gap-1 col-span-4">
+            <input
+              className="input py-1.5 text-sm"
+              placeholder="%"
+              value={c.percentual}
+              onChange={e => update(i, 'percentual', e.target.value)}
+            />
+            <span className="text-slate-500 text-xs">%</span>
+          </div>
+          <button
+            onClick={() => removeCat(i)}
+            className="btn-danger px-2 py-1.5 text-xs col-span-1"
+            disabled={categorias.length <= 1}
+          >✕</button>
+        </div>
+      ))}
+      <button onClick={addCat} className="btn text-xs mt-1 w-fit">
+        + Adicionar categoria
+      </button>
+    </div>
+  )
+}
+
 function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   const isEdit = modo === 'editar'
   const anoAtual = new Date().getFullYear()
@@ -120,6 +178,9 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         dia_lancamento: meta.dia_lancamento ?? '28',
         semestre: meta.semestre ?? 'FEV_SET',
         ano: meta.ano ? String(meta.ano) : String(anoAtual),
+        tipo_calculo: meta.tipo_calculo ?? 'MARGINAL',
+        config_booleano: meta.config_booleano ?? EMPTY_FORM.config_booleano,
+        config_categorico: meta.config_categorico ?? EMPTY_FORM.config_categorico,
         ranges: meta.ranges ?? EMPTY_FORM.ranges,
       }
     }
@@ -149,6 +210,9 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         dia_lancamento: Number(form.dia_lancamento),
         semestre: form.semestre,
         ano: Number(form.ano) || anoAtual,
+        tipo_calculo: form.tipo_calculo,
+        config_booleano: form.config_booleano,
+        config_categorico: form.config_categorico,
         ranges: form.ranges,
       })
       onClose()
@@ -198,6 +262,8 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
             <p className="text-[10px] text-slate-600 mt-1">Soma dos pesos = 100% do PPR</p>
           </div>
         </div>
+
+
 
         {/* Direção */}
         <div>
@@ -271,17 +337,71 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
           </div>
         </div>
 
-        {/* Ranges */}
-        <div>
-          <label className="label">Faixas de percentual PPR</label>
-          <p className="text-[10px] text-slate-500 mb-2">
-            Configure os valores e o percentual PPR correspondente. O sistema valida o lançamento contra estas faixas.
-          </p>
-          <RangeEditor
-            ranges={form.ranges}
-            onChange={v => set('ranges', v)}
-            direcao={form.direcao}
-          />
+        {/* Editor de Configuração */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="label">Configuração da Meta</label>
+            <p className="text-[10px] text-slate-500 mb-3">
+              Configure as regras de percentual PPR atingido para esta meta. O sistema validará o lançamento contra estas regras.
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'BOOLEANO', label: 'Booleano', desc: 'Concluído / Não Concluído' },
+                { value: 'CATEGORICO', label: 'Categórico', desc: 'A=100%, B=80%...' },
+                { value: 'MARGINAL', label: 'Marginal', desc: 'Faixas de valores (De/Até)' },
+              ].map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => set('tipo_calculo', t.value)}
+                  className={`flex flex-col items-start px-3 py-2.5 rounded border text-left transition-all
+                    ${form.tipo_calculo === t.value
+                      ? 'border-brand-500/50 bg-brand-500/10 text-brand-300'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/8'
+                    }`}
+                >
+                  <span className="text-sm font-medium">{t.label}</span>
+                  <span className="text-[10px] opacity-70 mt-0.5">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.tipo_calculo === 'BOOLEANO' && (
+            <div className="grid grid-cols-2 gap-3 bg-white/5 p-3 rounded border border-white/5">
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase font-semibold">Valor de Sucesso (100%)</label>
+                <input
+                  className="input py-1.5 text-sm mt-1"
+                  value={form.config_booleano.valor_sucesso}
+                  onChange={e => set('config_booleano', { ...form.config_booleano, valor_sucesso: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase font-semibold">Valor de Falha (0%)</label>
+                <input
+                  className="input py-1.5 text-sm mt-1"
+                  value={form.config_booleano.valor_falha}
+                  onChange={e => set('config_booleano', { ...form.config_booleano, valor_falha: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {form.tipo_calculo === 'CATEGORICO' && (
+            <CategoricoEditor 
+              categorias={form.config_categorico} 
+              onChange={v => set('config_categorico', v)} 
+            />
+          )}
+
+          {form.tipo_calculo === 'MARGINAL' && (
+            <RangeEditor
+              ranges={form.ranges}
+              onChange={v => set('ranges', v)}
+              direcao={form.direcao}
+            />
+          )}
         </div>
 
         {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{erro}</p>}
@@ -350,7 +470,34 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
         </div>
       </div>
 
-      {meta.ranges?.length > 0 && (
+      {(meta.tipo_calculo === 'BOOLEANO' && meta.config_booleano) && (
+        <div className="mt-3 pt-3 border-t border-white/8">
+          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Booleano PPR</p>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-[10px] font-mono bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-300">
+              {meta.config_booleano.valor_sucesso} = 100%
+            </span>
+            <span className="text-[10px] font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-300">
+              {meta.config_booleano.valor_falha} = 0%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {(meta.tipo_calculo === 'CATEGORICO' && meta.config_categorico?.length > 0) && (
+        <div className="mt-3 pt-3 border-t border-white/8">
+          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Categorias PPR</p>
+          <div className="flex flex-wrap gap-1">
+            {meta.config_categorico.map((c, i) => (
+              <span key={i} className="text-[10px] font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-200">
+                {c.categoria} = {c.percentual}%
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {((!meta.tipo_calculo || meta.tipo_calculo === 'MARGINAL') && meta.ranges?.length > 0) && (
         <div className="mt-3 pt-3 border-t border-white/8">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Faixas PPR</p>
           <div className="flex flex-wrap gap-1">
