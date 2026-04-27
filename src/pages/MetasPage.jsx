@@ -378,12 +378,15 @@ export default function MetasPage({ session }) {
   const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(null)
   const [filtroSetor, setFiltroSetor] = useState('')
+  const [filtroArea, setFiltroArea] = useState('')
   const [filtroSemestre, setFiltroSemestre] = useState('')
   const [filtroAno, setFiltroAno] = useState(String(anoAtual))
   const { setores } = useSetores()
-  const { papel, setorIds, metasPermitidas, isAC, isLM, podeCriarMeta } = usePerfil(session)
+  const { papel, setorIds, metasPermitidas, isAC, isLM, podeCriarMeta, loading: perfilLoading } = usePerfil(session)
 
   const fetchMetas = useCallback(async () => {
+    if (perfilLoading) return;
+
     setLoading(true)
     let query = supabase
       .from('metas')
@@ -391,20 +394,35 @@ export default function MetasPage({ session }) {
       .order('nome')
 
     if (filtroSetor) query = query.eq('setor_id', filtroSetor)
+    if (filtroArea) {
+      // Find all sectors that are descendants of the selected Area
+      const idsArea = [filtroArea]
+      const queue = [filtroArea]
+      while (queue.length > 0) {
+        const curr = queue.shift()
+        const children = setores.filter(s => s.parent_id === curr).map(s => s.id)
+        idsArea.push(...children)
+        queue.push(...children)
+      }
+      query = query.in('setor_id', idsArea)
+    }
     if (filtroSemestre) query = query.eq('semestre', filtroSemestre)
     if (filtroAno) query = query.eq('ano', Number(filtroAno))
 
     if (!isAC) {
-      if (metasPermitidas !== null) {
-        if (metasPermitidas.length > 0) {
-          query = query.in('id', metasPermitidas)
-        } else {
-          setMetas([])
-          setLoading(false)
-          return
-        }
-      } else if (setorIds.length > 0) {
+      const hasSetores = setorIds.length > 0
+      const hasMetas = metasPermitidas !== null && metasPermitidas.length > 0
+      
+      if (hasSetores && hasMetas) {
+        query = query.or(`setor_id.in.(${setorIds.join(',')}),id.in.(${metasPermitidas.join(',')})`)
+      } else if (hasSetores) {
         query = query.in('setor_id', setorIds)
+      } else if (hasMetas) {
+        query = query.in('id', metasPermitidas)
+      } else {
+        setMetas([])
+        setLoading(false)
+        return
       }
     }
 
@@ -412,7 +430,7 @@ export default function MetasPage({ session }) {
     if (error) setErro(error.message)
     else setMetas(data ?? [])
     setLoading(false)
-  }, [filtroSetor, filtroSemestre, filtroAno, isAC, JSON.stringify(setorIds), JSON.stringify(metasPermitidas)])
+  }, [filtroSetor, filtroArea, filtroSemestre, filtroAno, isAC, JSON.stringify(setorIds), JSON.stringify(metasPermitidas), perfilLoading, JSON.stringify(setores)])
 
   useEffect(() => {
     fetchMetas()
@@ -424,11 +442,25 @@ export default function MetasPage({ session }) {
   }, [fetchMetas])
 
   async function handleSave(payload) {
+    // Determina a qual DIVISÃO (Área) o setor pertence
+    const setorEscolhido = setores.find(s => s.id === payload.setor_id)
+    let area_id = null
+    let current = setorEscolhido
+    while (current) {
+      if (current.tipo === 'DIVISÃO') {
+        area_id = current.id
+        break
+      }
+      current = setores.find(s => s.id === current.parent_id)
+    }
+
+    const finalPayload = { ...payload, area_id }
+
     if (modal?.modo === 'editar') {
-      const { error } = await supabase.from('metas').update(payload).eq('id', modal.meta.id)
+      const { error } = await supabase.from('metas').update(finalPayload).eq('id', modal.meta.id)
       if (error) throw error
     } else {
-      const { error } = await supabase.from('metas').insert(payload)
+      const { error } = await supabase.from('metas').insert(finalPayload)
       if (error) throw error
     }
   }
@@ -455,9 +487,10 @@ export default function MetasPage({ session }) {
   const pesoTotal = metas.filter(m => m.ativa !== false && (!filtroSetor || m.setor_id === filtroSetor))
     .reduce((s, m) => s + (Number(m.peso) || 0), 0)
 
-  const temFiltroAtivo = filtroSetor || filtroSemestre || filtroAno
+  const temFiltroAtivo = filtroArea || filtroSetor || filtroSemestre || filtroAno
 
   function limparFiltros() {
+    setFiltroArea('')
     setFiltroSetor('')
     setFiltroSemestre('')
     setFiltroAno('')
@@ -496,20 +529,47 @@ export default function MetasPage({ session }) {
         <div className="flex items-end gap-5 flex-wrap">
 
           {isAC && (
-          <div className="flex flex-col gap-1.5">
-            {/* Filtro: Setores */}
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
-              Setores
-            </span>
-            <select
-              className="input w-auto text-xs py-1.5 px-2"
-              value={filtroSetor}
-              onChange={e => setFiltroSetor(e.target.value)}
-            >
-              <option value="">Todos os setores</option>
-              {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
-          </div>
+          <>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+                Área / Divisão
+              </span>
+              <select
+                className="input w-auto text-xs py-1.5 px-2"
+                value={filtroArea}
+                onChange={e => {
+                  setFiltroArea(e.target.value)
+                  setFiltroSetor('') // Limpa o setor ao trocar de área
+                }}
+              >
+                <option value="">Todas as áreas</option>
+                {setores.filter(s => s.tipo === 'DIVISÃO').map(s => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
+                Setores
+              </span>
+              <select
+                className="input w-auto text-xs py-1.5 px-2"
+                value={filtroSetor}
+                onChange={e => setFiltroSetor(e.target.value)}
+              >
+                <option value="">Todos os setores</option>
+                {setores
+                  // Se tiver uma área filtrada, mostra apenas setores abaixo dela
+                  .filter(s => !filtroArea || (function checkDescendant(sid) {
+                     if (sid === filtroArea) return true;
+                     const parent = setores.find(x => x.id === sid)?.parent_id;
+                     return parent ? checkDescendant(parent) : false;
+                  })(s.id))
+                  .map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select>
+            </div>
+          </>
           )}
 
           {/* Filtro: Semestre */}

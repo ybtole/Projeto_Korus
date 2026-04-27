@@ -103,21 +103,26 @@ export function useConnectionStatus() {
   const [status, setStatus] = useState('connecting')
 
   useEffect(() => {
+    let mounted = true
+    const channelName = `connection-probe-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    
     const probe = supabase
-      .channel('connection-probe')
+      .channel(channelName)
       .subscribe((s) => {
+        if (!mounted) return
         if (s === 'SUBSCRIBED')    setStatus('connected')
         if (s === 'CHANNEL_ERROR') setStatus('disconnected')
         if (s === 'CLOSED')        setStatus('disconnected')
         if (s === 'TIMED_OUT')     setStatus('disconnected')
       })
 
-    const goOffline = () => setStatus('disconnected')
-    const goOnline  = () => setStatus('connecting')
+    const goOffline = () => { if (mounted) setStatus('disconnected') }
+    const goOnline  = () => { if (mounted) setStatus('connecting') }
     window.addEventListener('offline', goOffline)
     window.addEventListener('online',  goOnline)
 
     return () => {
+      mounted = false
       supabase.removeChannel(probe)
       window.removeEventListener('offline', goOffline)
       window.removeEventListener('online',  goOnline)

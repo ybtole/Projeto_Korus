@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 export function usePerfil(session) {
-  const [papel, setPapel] = useState('Usuário')
+  const [papel, setPapel] = useState(() => session?.user?.user_metadata?.papel ?? 'Usuário')
   const [setorIds, setSetorIds] = useState([])
   const [metasPermitidas, setMetasPermitidas] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const fetch = useCallback(async () => {
     if (!session?.user) return
