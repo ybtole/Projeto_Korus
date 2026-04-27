@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useRealtimeSync } from './useRealtimeSync'
 
 export function useResponsabilidades() {
   const [responsabilidades, setResponsabilidades] = useState([])
@@ -45,6 +46,14 @@ export function useResponsabilidades() {
     fetchSetores()
     fetchMetas()
   }, [fetchResponsabilidades, fetchUsuarios, fetchSetores, fetchMetas])
+
+  useRealtimeSync({
+    papeis:   fetchResponsabilidades,
+    metas_lm: fetchResponsabilidades,
+    setores:  fetchSetores,
+    usuarios: fetchUsuarios,
+    metas:    fetchMetas,
+  })
 
   const adicionar = async ({ user_id, setor_id, papel, meta_id }) => {
     if (papel === 'L.M') {

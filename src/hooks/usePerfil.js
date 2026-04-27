@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useRealtimeSync } from './useRealtimeSync'
 
 export function usePerfil(session) {
   const [papel, setPapel] = useState(() => session?.user?.user_metadata?.papel ?? 'Usuário')
@@ -52,6 +53,8 @@ export function usePerfil(session) {
     }
     fetch()
   }, [fetch, session])
+
+  useRealtimeSync({ papeis: fetch, metas_lm: fetch })
 
   const isAC = papel === 'A.C'
   const isTI = papel === 'T.I'

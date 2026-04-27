@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { useRealtimeSync } from './useRealtimeSync'
 
 export function useMetas(setor_id = null) {
   const [metas, setMetas] = useState([])
@@ -22,6 +23,8 @@ export function useMetas(setor_id = null) {
   }, [setor_id])
 
   useEffect(() => { fetch() }, [fetch])
+
+  useRealtimeSync({ metas: fetch })
 
   return { metas, loading, erro, refetch: fetch }
 }
