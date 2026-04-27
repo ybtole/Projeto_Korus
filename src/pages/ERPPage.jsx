@@ -419,14 +419,14 @@ function ResponsabilidadesModal({ usuario, onClose, currentUserRole, currentUser
                   {metasFiltradas.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                 </select>
               ) : (
-                <select value={form.setor_id} onChange={e => setForm(p => ({ ...p, setor_id: e.target.value }))} className="input text-xs py-1.5" disabled={!form.papel}>
+                <select value={form.setor_id} onChange={e => setForm(p => ({ ...p, setor_id: e.target.value }))} className="input text-xs py-1.5">
                   <option value="">Selecione o setor...</option>
                   {setoresFiltrados.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                 </select>
               )}
             </div>
             <div className="w-28">
-              <select value={form.papel} onChange={e => setForm(p => ({ ...p, papel: e.target.value, setor_id: '', meta_id: '' }))} className="input text-xs py-1.5">
+              <select value={form.papel} onChange={e => setForm(p => ({ ...p, papel: e.target.value }))} className="input text-xs py-1.5">
                 <option value="">Papel...</option>
                 {PAPEIS_RESP.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
@@ -490,7 +490,7 @@ export default function ERPPage({ session }) {
   const { isAC, isTI: isTIPerfil, isRA, isRM, setorIds, podeVerERP } = usePerfil(session)
 
   const { usuarios, loading, erro, listar, criar, remover } = useAdminUsuarios()
-  const { responsabilidades, loading: loadingResp } = useResponsabilidades()
+  const { responsabilidades, metasLm, loading: loadingResp } = useResponsabilidades()
   const [busca, setBusca] = useState('')
   const [modalCriar, setModalCriar] = useState(false)
   const [modalEditar, setModalEditar] = useState(null)
@@ -640,11 +640,26 @@ export default function ERPPage({ session }) {
               ? new Date(u.last_sign_in_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
               : 'Nunca'
 
+            // Pega papéis adicionais das responsabilidades
+            const papeisAdicionais = new Set()
+            responsabilidades.forEach(r => {
+              if (r.user_id === u.id || r.usuarios?.id === u.id) {
+                papeisAdicionais.add(r.papel)
+              }
+            })
+            metasLm?.forEach(m => {
+              if (m.perfil_id === u.id) {
+                papeisAdicionais.add('L.M')
+              }
+            })
+            papeisAdicionais.delete(u.papel)
+
             return (
               <div
                 key={u.id}
+                onClick={() => setModalResp(u)}
                 onContextMenu={(e) => handleContextMenu(e, u)}
-                className="grid gap-4 px-5 py-3.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors items-center cursor-context-menu group"
+                className="grid gap-4 px-5 py-3.5 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors items-center cursor-pointer group"
                 style={{ gridTemplateColumns: '1.6fr 1.2fr 1fr 1.2fr' }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -656,11 +671,16 @@ export default function ERPPage({ session }) {
                 <span className="text-xs text-slate-400 truncate">
                   {u.nome ?? <span className="italic text-slate-600">—</span>}
                 </span>
-                <span>
+                <div className="flex flex-wrap gap-1">
                   <span className={`text-[11px] font-mono px-2 py-0.5 rounded border whitespace-nowrap ${PAPEL_COLORS[u.papel] ?? PAPEL_COLORS['—']}`}>
                     {u.papel}
                   </span>
-                </span>
+                  {Array.from(papeisAdicionais).map(p => (
+                    <span key={p} className={`text-[11px] font-mono px-2 py-0.5 rounded border whitespace-nowrap ${PAPEL_COLORS[p] ?? PAPEL_COLORS['—']}`}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-slate-500 font-mono whitespace-nowrap">{ultimoAcesso}</span>
                   {/* Botão pincel */}
