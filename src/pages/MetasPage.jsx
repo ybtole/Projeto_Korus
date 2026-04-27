@@ -417,9 +417,12 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   )
 }
 
-function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir }) {
+function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir, totalPesoSetor, numMetasSetor }) {
   const pct = meta.peso ? `${meta.peso}%` : '—'
   const isAtiva = meta.ativa !== false
+  const pesoEquitativo = numMetasSetor > 0 && totalPesoSetor > 0
+    ? (totalPesoSetor / numMetasSetor).toFixed(2)
+    : null
 
   return (
     <div className={`card p-4 transition-all ${isAtiva ? '' : 'opacity-50'}`}>
@@ -469,6 +472,16 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
           <p className="text-slate-200 font-mono">Dia {meta.dia_lancamento ?? 28}</p>
         </div>
       </div>
+
+      {pesoEquitativo !== null && (
+        <div className="mt-2.5 pt-2.5 border-t border-white/5 flex items-center gap-2 text-[10px] text-slate-600 flex-wrap">
+          <span className="font-mono">{numMetasSetor} meta{numMetasSetor !== 1 ? 's' : ''} no setor</span>
+          <span>·</span>
+          <span className="font-mono">{totalPesoSetor % 1 === 0 ? totalPesoSetor : Number(totalPesoSetor).toFixed(2)}% PPR do setor</span>
+          <span>·</span>
+          <span className="font-mono text-slate-500">≈{pesoEquitativo}% por meta</span>
+        </div>
+      )}
 
       {(meta.tipo_calculo === 'BOOLEANO' && meta.config_booleano) && (
         <div className="mt-3 pt-3 border-t border-white/8">
@@ -785,30 +798,37 @@ export default function MetasPage({ session }) {
             )}
           </div>
         )}
-        {!loading && !erro && Object.entries(porSetor).map(([setor, metasDoSetor]) => (
-          <div key={setor} className="mb-8">
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{setor}</h2>
-              <div className="flex-1 h-px bg-white/8" />
-              <span className="text-xs text-slate-600 font-mono">
-                {metasDoSetor.filter(m => m.ativa !== false).reduce((s, m) => s + (Number(m.peso) || 0), 0)}% do PPR
-              </span>
+        {!loading && !erro && Object.entries(porSetor).map(([setor, metasDoSetor]) => {
+          const metasAtivas = metasDoSetor.filter(m => m.ativa !== false)
+          const totalPesoSetor = metasAtivas.reduce((s, m) => s + (Number(m.peso) || 0), 0)
+          const numMetasSetor = metasAtivas.length
+          return (
+            <div key={setor} className="mb-8">
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{setor}</h2>
+                <div className="flex-1 h-px bg-white/8" />
+                <span className="text-xs text-slate-600 font-mono">
+                  {totalPesoSetor % 1 === 0 ? totalPesoSetor : totalPesoSetor.toFixed(2)}% do PPR · {numMetasSetor} meta{numMetasSetor !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {metasDoSetor.map(m => (
+                  <MetaCard
+                    key={m.id}
+                    meta={m}
+                    totalPesoSetor={totalPesoSetor}
+                    numMetasSetor={numMetasSetor}
+                    onEdit={meta => setModal({ modo: 'editar', meta })}
+                    onDelete={handleDelete}
+                    onToggleAtivo={handleToggleAtivo}
+                    podeEditar={isAC || papel === 'R.A' || papel === 'R.M'}
+                    podeExcluir={isAC}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
-              {metasDoSetor.map(m => (
-                <MetaCard
-                  key={m.id}
-                  meta={m}
-                  onEdit={meta => setModal({ modo: 'editar', meta })}
-                  onDelete={handleDelete}
-                  onToggleAtivo={handleToggleAtivo}
-                  podeEditar={isAC || papel === 'R.A' || papel === 'R.M'}
-                  podeExcluir={isAC}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {modal && (
