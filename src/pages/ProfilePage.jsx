@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useResponsabilidades } from '../hooks/useResponsabilidades'
 
 const PAPEL_BADGE_COLORS = {
   'A.C':     'bg-amber-900/50 text-amber-300 border-amber-500/30',
@@ -42,6 +43,26 @@ export default function ProfilePage({ session }) {
   const nome = session.user.user_metadata?.nome ?? formatCpf(cpfLimpo)
   const papel = session.user.user_metadata?.papel ?? 'Usuário'
   const senhaTrocada = !!session.user.user_metadata?.senha_trocada
+
+  const { responsabilidades, metasLm, loading: loadingResp } = useResponsabilidades()
+
+  const userId = session.user.id
+  const papeisAdicionais = new Set()
+  const minhaListaAtribuicoes = []
+
+  responsabilidades?.forEach(r => {
+    if (r.user_id === userId || r.usuarios?.id === userId) {
+      papeisAdicionais.add(r.papel)
+      minhaListaAtribuicoes.push({ id: r.id, papel: r.papel, desc: r.setores?.nome ?? '—' })
+    }
+  })
+  metasLm?.forEach(m => {
+    if (m.perfil_id === userId) {
+      papeisAdicionais.add('L.M')
+      minhaListaAtribuicoes.push({ id: m.id, papel: 'L.M', desc: `Meta: ${m.metas?.nome ?? '—'}` })
+    }
+  })
+  papeisAdicionais.delete(papel)
 
   // Exibição da senha atual
   const [mostrarSenhaAtual, setMostrarSenhaAtual] = useState(false)
@@ -118,12 +139,41 @@ export default function ProfilePage({ session }) {
               <p className="text-sm text-slate-200 font-mono">{formatCpf(cpfLimpo)}</p>
             </div>
 
-            {/* Papel */}
+            {/* Responsabilidades */}
             <div>
-              <p className="label mb-1">Responsabilidade</p>
-              <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${PAPEL_BADGE_COLORS[papel] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
-                {papel}
-              </span>
+              <p className="label mb-1">Cargos e Responsabilidades</p>
+              <div className="flex flex-wrap gap-1">
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${PAPEL_BADGE_COLORS[papel] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                  {papel}
+                </span>
+                {Array.from(papeisAdicionais).map(p => (
+                  <span key={p} className={`text-[11px] font-mono px-2 py-0.5 rounded border ${PAPEL_BADGE_COLORS[p] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                    {p}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-3">
+                {loadingResp ? (
+                  <div className="text-xs text-slate-500 flex items-center gap-2">
+                    <div className="w-3 h-3 border border-brand-500 border-t-transparent rounded-full animate-spin" />
+                    Carregando vínculos...
+                  </div>
+                ) : minhaListaAtribuicoes.length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    {minhaListaAtribuicoes.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2 rounded border border-white/5 bg-white/5">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex-shrink-0 ${PAPEL_BADGE_COLORS[r.papel] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                          {r.papel}
+                        </span>
+                        <span className="text-xs text-slate-300">{r.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600 italic">Nenhum vínculo adicional de setor ou meta.</p>
+                )}
+              </div>
             </div>
 
             {/* Senha atual */}
