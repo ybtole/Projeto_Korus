@@ -133,7 +133,22 @@ export default function MainLayout({ session }) {
 
   const cpf          = session.user.email?.replace('@aguia.com', '') ?? '—'
   const papel        = session.user.user_metadata?.papel ?? 'Usuário'
+  const nome         = session.user.user_metadata?.nome ?? cpf
   const senhaTrocada = !!session.user.user_metadata?.senha_trocada
+
+  const [todosPapeis, setTodosPapeis] = useState([papel])
+
+  useEffect(() => {
+    supabase
+      .from('papeis')
+      .select('papel')
+      .eq('user_id', session.user.id)
+      .then(({ data }) => {
+        if (!data?.length) return
+        const extras = [...new Set(data.map(v => v.papel))].filter(p => p !== papel)
+        if (extras.length) setTodosPapeis([papel, ...extras])
+      })
+  }, [session.user.id, papel])
 
   // ── Redirecionamento para páginas restritas ─────────────────────────────────
   useEffect(() => {
@@ -238,11 +253,13 @@ export default function MainLayout({ session }) {
               {cpf.replace(/\D/g, '').slice(0, 2)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-mono text-slate-300 truncate">{cpf}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[papel] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
-                  {papel}
-                </span>
+              <p className="text-xs text-slate-300 truncate">{nome}</p>
+              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                {todosPapeis.map(p => (
+                  <span key={p} className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[p] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                    {p}
+                  </span>
+                ))}
               </div>
             </div>
           </button>
