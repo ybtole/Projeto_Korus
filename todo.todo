@@ -5,9 +5,13 @@ Adicionar filtros de ano em DashboardPage.jsx, MetasPage.jsx e KanbanPage.jsx - 
 Construir aba de adição de responsabilidades - OK
 Adicionar Responsabilidade de T.I - OK
 Multiplicidade de Cargos - OK
-Tirar possiblidade de criação de setor na aba de estrutura oragazicional para usuários que não sejam "A.C"
+Tirar possiblidade de criação de setor na aba de estrutura oragazicional para usuários que não sejam "T.I" - OK
 Troca de senha após primeiro login
 Apenas 1 cargo T.I
 Filtro de Metas começar por Geral
 Calcular peso das metas automaticamente
 Remover Filtro de A.C na atribuição de responsabilidades
+Criação de responsabilidade "Diretor" com login via cartão
+Amostragem automática de dados em tela, sem necessidade de refresh
+Automação de cálculo de peso de PPR
+Melhorar input de margens percentuais de metas

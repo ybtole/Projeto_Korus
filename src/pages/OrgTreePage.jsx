@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useSetores } from '../hooks/useSetores'
+import { usePerfil } from '../hooks/usePerfil'
 import NeuralTree from '../components/tree/NeuralTree'
 import SetorModal from '../components/tree/SetorModal'
 
-export default function OrgTreePage() {
+export default function OrgTreePage({ session }) {
   const { setores, loading, erro, criar, editar, excluir } = useSetores()
+  const { isTI } = usePerfil(session)
   const [modal, setModal] = useState(null)
   // modal: { modo: 'criar'|'editar'|'sub', setor?, parent? }
 
@@ -43,9 +45,11 @@ export default function OrgTreePage() {
             <span className="text-green-400">● Realtime ativo</span>
           </p>
         </div>
-        <button onClick={() => openAdd(null)} className="btn-primary">
-          + Novo setor raiz
-        </button>
+        {isTI && (
+          <button onClick={() => openAdd(null)} className="btn-primary">
+            + Novo setor raiz
+          </button>
+        )}
       </div>
 
       {/* Legend */}
@@ -62,7 +66,7 @@ export default function OrgTreePage() {
           </span>
         ))}
         <span className="text-xs text-slate-600 ml-auto">
-          Passe o mouse sobre um nó para ver ações
+          {isTI ? 'Passe o mouse sobre um nó para ver ações' : 'Somente T.I pode editar a estrutura'}
         </span>
       </div>
 
@@ -82,6 +86,7 @@ export default function OrgTreePage() {
         {!loading && !erro && (
           <NeuralTree
             setores={setores}
+            canEdit={isTI}
             onAdd={openAdd}
             onEdit={openEdit}
             onDelete={handleDelete}
