@@ -527,7 +527,7 @@ export default function MetasPage({ session }) {
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroArea, setFiltroArea] = useState('')
   const [filtroSemestre, setFiltroSemestre] = useState('')
-  const [filtroAno, setFiltroAno] = useState(String(anoAtual))
+  const [filtroAno, setFiltroAno] = useState('')
   const { setores } = useSetores()
   const { papel, setorIds, metasPermitidas, isAC, isLM, podeCriarMeta, loading: perfilLoading } = usePerfil(session)
 

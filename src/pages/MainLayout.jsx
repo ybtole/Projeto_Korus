@@ -136,6 +136,13 @@ export default function MainLayout({ session }) {
   const nome         = session.user.user_metadata?.nome ?? cpf
   const senhaTrocada = !!session.user.user_metadata?.senha_trocada
 
+  const diasDesdeCreacao = session.user.created_at
+    ? (Date.now() - new Date(session.user.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    : 0
+  const bloqueante   = diasDesdeCreacao > 7
+  const diasRestantes = Math.max(0, Math.ceil(7 - diasDesdeCreacao))
+
+  const [dismissed, setDismissed]   = useState(false)
   const [todosPapeis, setTodosPapeis] = useState([papel])
 
   useEffect(() => {
@@ -282,26 +289,48 @@ export default function MainLayout({ session }) {
         {page === 'perfil'    && <ProfilePage   session={session} />}
       </main>
 
-      {/* ── Overlay de primeiro login ─────────────────────────────────────── */}
-      {!senhaTrocada && page !== 'perfil' && (
+      {/* ── Overlay de troca de senha ─────────────────────────────────────── */}
+      {!senhaTrocada && page !== 'perfil' && (bloqueante || !dismissed) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="card p-8 max-w-sm w-full mx-4 flex flex-col gap-5">
+          <div className="relative card p-8 max-w-sm w-full mx-4 flex flex-col gap-5">
+
+            {/* Botão fechar — só aparece enquanto não está bloqueante */}
+            {!bloqueante && (
+              <button
+                onClick={() => setDismissed(true)}
+                className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 p-1 transition-colors"
+                aria-label="Fechar aviso"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${bloqueante ? 'bg-red-500/20 border border-red-500/30' : 'bg-amber-500/20 border border-amber-500/30'}`}>
+                <svg viewBox="0 0 24 24" className={`w-4 h-4 ${bloqueante ? 'text-red-400' : 'text-amber-400'}`} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                   <line x1="12" y1="9" x2="12" y2="13"/>
                   <line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-white">Troca de senha obrigatória</h2>
+                <h2 className="text-sm font-semibold text-white">
+                  {bloqueante ? 'Troca de senha obrigatória' : 'Troca de senha recomendada'}
+                </h2>
                 <p className="text-xs text-slate-500 mt-0.5">Segurança da conta</p>
               </div>
             </div>
+
             <p className="text-sm text-slate-400 leading-relaxed">
-              Por segurança, você está utilizando a senha padrão do sistema (seu CPF). É necessário definir uma senha pessoal antes de continuar.
+              {bloqueante
+                ? 'O prazo para troca de senha expirou. Você deve definir uma senha pessoal antes de continuar usando o sistema.'
+                : `Você está usando a senha padrão do sistema (seu CPF). Recomendamos trocá-la por uma senha pessoal. Você tem ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} antes que a troca se torne obrigatória.`
+              }
             </p>
+
             <button
               onClick={() => setPage('perfil')}
               className="btn-primary w-full justify-center py-2.5"
