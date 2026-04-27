@@ -64,7 +64,7 @@ function layout(nodes) {
   return { positions, width: maxX, height: maxY, byId, childrenOf }
 }
 
-function NodeBox({ node, pos, selected, onSelect, onAdd, onEdit, onDelete, hasChildren, panMoved }) {
+function NodeBox({ node, pos, selected, onSelect, onAdd, onEdit, onDelete, hasChildren, panMoved, canEdit }) {
   const c = TYPE_COLORS[node.tipo] ?? DEFAULT_COLOR
 
   const guard = (fn) => (e) => {
@@ -109,24 +109,26 @@ function NodeBox({ node, pos, selected, onSelect, onAdd, onEdit, onDelete, hasCh
         {node.nome.length > 20 ? node.nome.slice(0, 19) + '…' : node.nome}
       </text>
 
-      <g className="opacity-0 group-hover:opacity-100" style={{ transition: 'opacity .15s' }}>
-        <g onClick={guard(() => onAdd(node))}
-          transform={`translate(${NODE_W - 48}, ${NODE_H - 16})`}>
-          <rect x={0} y={0} width={14} height={14} rx="3" fill="#2a6099" opacity=".8" />
-          <text x={3.5} y={10.5} fontSize="10" fill="white" fontFamily="monospace">+</text>
+      {canEdit && (
+        <g className="opacity-0 group-hover:opacity-100" style={{ transition: 'opacity .15s' }}>
+          <g onClick={guard(() => onAdd(node))}
+            transform={`translate(${NODE_W - 48}, ${NODE_H - 16})`}>
+            <rect x={0} y={0} width={14} height={14} rx="3" fill="#2a6099" opacity=".8" />
+            <text x={3.5} y={10.5} fontSize="10" fill="white" fontFamily="monospace">+</text>
+          </g>
+          <g onClick={guard(() => onEdit(node))}
+            transform={`translate(${NODE_W - 32}, ${NODE_H - 16})`}>
+            <rect x={0} y={0} width={14} height={14} rx="3" fill="#374151" opacity=".8" />
+            <text x={3} y={10.5} fontSize="9" fill="#94a3b8" fontFamily="monospace">✎</text>
+          </g>
+          <g onClick={guard(() => onDelete(node, hasChildren))}
+            transform={`translate(${NODE_W - 16}, ${NODE_H - 16})`}>
+            <rect x={0} y={0} width={14} height={14} rx="3"
+              fill={hasChildren ? '#374151' : '#7f1d1d'} opacity=".8" />
+            <text x={4} y={10.5} fontSize="10" fill={hasChildren ? '#4b5563' : '#fca5a5'} fontFamily="monospace">×</text>
+          </g>
         </g>
-        <g onClick={guard(() => onEdit(node))}
-          transform={`translate(${NODE_W - 32}, ${NODE_H - 16})`}>
-          <rect x={0} y={0} width={14} height={14} rx="3" fill="#374151" opacity=".8" />
-          <text x={3} y={10.5} fontSize="9" fill="#94a3b8" fontFamily="monospace">✎</text>
-        </g>
-        <g onClick={guard(() => onDelete(node, hasChildren))}
-          transform={`translate(${NODE_W - 16}, ${NODE_H - 16})`}>
-          <rect x={0} y={0} width={14} height={14} rx="3"
-            fill={hasChildren ? '#374151' : '#7f1d1d'} opacity=".8" />
-          <text x={4} y={10.5} fontSize="10" fill={hasChildren ? '#4b5563' : '#fca5a5'} fontFamily="monospace">×</text>
-        </g>
-      </g>
+      )}
 
       <circle cx={NODE_W / 2} cy={0} r={3} fill={c.border} />
       <circle cx={NODE_W / 2} cy={NODE_H} r={3} fill={c.border} />
@@ -149,7 +151,7 @@ function Edge({ from, to, animated }) {
   )
 }
 
-export default function NeuralTree({ setores, onAdd, onEdit, onDelete }) {
+export default function NeuralTree({ setores, canEdit, onAdd, onEdit, onDelete }) {
   const [selected, setSelected] = useState(null)
   const [grabbing, setGrabbing] = useState(false)
 
@@ -254,6 +256,7 @@ export default function NeuralTree({ setores, onAdd, onEdit, onDelete }) {
                 onSelect={setSelected}
                 onAdd={onAdd}
                 onEdit={onEdit}
+                canEdit={canEdit}
                 panMoved={panMoved}
                 onDelete={(node, hasKids) => {
                   if (hasKids) return

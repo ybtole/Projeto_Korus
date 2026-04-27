@@ -6,6 +6,7 @@ import KanbanPage     from './KanbanPage'
 import MetasPage      from './MetasPage'
 import DashboardPage  from './DashboardPage'
 import ERPPage        from './ERPPage'
+import ProfilePage    from './ProfilePage'
 
 // ─── Cores dos badges de papel ────────────────────────────────────────────────
 
@@ -130,8 +131,9 @@ export default function MainLayout({ session }) {
   const [badges, setBadges] = useState({ kanban: 0 })
   const connStatus = useConnectionStatus()
 
-  const cpf   = session.user.email?.replace('@aguia.com', '') ?? '—'
-  const papel = session.user.user_metadata?.papel ?? 'Usuário'
+  const cpf          = session.user.email?.replace('@aguia.com', '') ?? '—'
+  const papel        = session.user.user_metadata?.papel ?? 'Usuário'
+  const senhaTrocada = !!session.user.user_metadata?.senha_trocada
 
   // ── Redirecionamento para páginas restritas ─────────────────────────────────
   useEffect(() => {
@@ -228,7 +230,10 @@ export default function MainLayout({ session }) {
 
         {/* ── Usuário + Sair ───────────────────────────────────────────────── */}
         <div className="px-4 py-4 border-t border-white/8 flex-shrink-0">
-          <div className="flex items-center gap-2.5 mb-3">
+          <button
+            onClick={() => setPage('perfil')}
+            className="flex items-center gap-2.5 mb-3 w-full text-left hover:bg-white/5 rounded-md px-1 -mx-1 py-1 -my-1 transition-colors"
+          >
             <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[11px] text-brand-200 font-mono flex-shrink-0 uppercase">
               {cpf.replace(/\D/g, '').slice(0, 2)}
             </div>
@@ -240,7 +245,7 @@ export default function MainLayout({ session }) {
                 </span>
               </div>
             </div>
-          </div>
+          </button>
           <button
             onClick={() => supabase.auth.signOut()}
             className="btn w-full justify-center text-xs py-1.5 text-slate-400 hover:text-red-400 hover:border-red-500/30"
@@ -257,7 +262,38 @@ export default function MainLayout({ session }) {
         {page === 'kanban'    && <KanbanPage    session={session} />}
         {page === 'tree'      && <OrgTreePage   session={session} />}
         {page === 'erp'       && <ERPPage       session={session} />}
+        {page === 'perfil'    && <ProfilePage   session={session} />}
       </main>
+
+      {/* ── Overlay de primeiro login ─────────────────────────────────────── */}
+      {!senhaTrocada && page !== 'perfil' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card p-8 max-w-sm w-full mx-4 flex flex-col gap-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-white">Troca de senha obrigatória</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Segurança da conta</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Por segurança, você está utilizando a senha padrão do sistema (seu CPF). É necessário definir uma senha pessoal antes de continuar.
+            </p>
+            <button
+              onClick={() => setPage('perfil')}
+              className="btn-primary w-full justify-center py-2.5"
+            >
+              Atualizar senha agora
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

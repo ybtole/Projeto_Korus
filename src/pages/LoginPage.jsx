@@ -6,6 +6,7 @@ export default function LoginPage() {
   const [senha, setSenha] = useState('')
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
+  const [mostrarSenha, setMostrarSenha] = useState(false)
 
   // CPF format: numbers only → email: 00000000000@aguia.com
   const formatCpf = (v) => {
@@ -64,14 +65,35 @@ export default function LoginPage() {
           </div>
           <div>
             <label className="label">Senha</label>
-            <input
-              className="input"
-              type="password"
-              placeholder="••••••••"
-              value={senha}
-              onChange={e => setSenha(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <input
+                className="input pr-10"
+                type={mostrarSenha ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={senha}
+                onChange={e => setSenha(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setMostrarSenha(v => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1"
+                tabIndex={-1}
+              >
+                {mostrarSenha ? (
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {erro && (
