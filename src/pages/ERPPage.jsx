@@ -6,7 +6,8 @@ import { usePerfil } from '../hooks/usePerfil'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const PAPEIS = ['A.C', 'T.I', 'R.A', 'R.M', 'L.M', 'Usuário']
+// Hierarquia: T.I (master) > A.C > R.A > R.M > L.M > Usuário
+const PAPEIS = ['T.I', 'A.C', 'R.A', 'R.M', 'L.M', 'Usuário']
 const PAPEL_LABELS = {
   'A.C':     'Analista de Custos',
   'T.I':     'Tecnologia da Informação',
@@ -44,12 +45,23 @@ function AcessoNegado() {
         </div>
         <h2 className="text-sm font-semibold text-white mb-1">Acesso Negado</h2>
         <p className="text-xs text-slate-400 leading-relaxed">
-          Apenas <span className="font-mono text-slate-300">A.C</span> e{' '}
-          <span className="font-mono text-slate-300">T.I</span> podem acessar o módulo ERP.
+          Este módulo requer um cargo com permissões de gestão.<br />
+          <span className="font-mono text-cyan-300">T.I</span>{' '}
+          <span className="text-slate-600 text-[10px]">(master)</span>,{' '}
+          <span className="font-mono text-amber-300">A.C</span>,{' '}
+          <span className="font-mono text-purple-300">R.A</span> e{' '}
+          <span className="font-mono text-blue-300">R.M</span> podem acessar o módulo ERP.
         </p>
       </div>
     </div>
   )
+}
+
+// ── Hierarquia de cargos (quanto maior o índice, maior a autoridade) ──────────
+const HIERARQUIA = ['Usuário', 'L.M', 'R.M', 'R.A', 'A.C', 'T.I']
+function nivelCargo(cargo) {
+  const idx = HIERARQUIA.indexOf(cargo)
+  return idx === -1 ? 0 : idx
 }
 
 // ── Menu de Contexto ──────────────────────────────────────────────────────────
@@ -59,8 +71,12 @@ function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onRespo
   const isAC = papel === 'A.C'
   const isRA = papel === 'R.A'
   const isRM = papel === 'R.M'
-  const canManage = isTI || isAC
-  const canAssign = canManage || isRA || isRM
+  // Hierarquia: T.I é master total; A.C só gerencia quem está estritamente abaixo
+  const meuNivel   = nivelCargo(papel)
+  const nivelAlvo  = nivelCargo(usuario.papel)
+  const estaAbaixo = nivelAlvo < meuNivel
+  const canManage  = isTI || (isAC && estaAbaixo)
+  const canAssign  = isTI || isAC || isRA || isRM
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -97,13 +113,19 @@ function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onRespo
         <span className={`inline-block mt-1 text-[10px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_COLORS[usuario.papel] ?? PAPEL_COLORS['—']}`}>
           {usuario.papel}
         </span>
+        {/* Badge Master para usuários T.I */}
+        {usuario.papel === 'T.I' && (
+          <span className="ml-1.5 inline-block text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-900/40 text-cyan-400 border border-cyan-500/20">
+            Master
+          </span>
+        )}
       </div>
 
       {/* Ações */}
       <div className="py-1">
 
-        {/* Editar nome — apenas T.I e não em si mesmo */}
-        {!isMe && isTI && (
+        {/* Editar nome — T.I pode editar qualquer um; A.C pode editar quem está abaixo */}
+        {!isMe && canManage && (
           <button onClick={() => { onEdit(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
             <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -113,7 +135,7 @@ function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onRespo
           </button>
         )}
 
-        {/* Mudar cargo — gerentes, exceto em si mesmo */}
+        {/* Mudar cargo — T.I muda qualquer um; A.C muda quem está abaixo */}
         {!isMe && canManage && (
           <button onClick={() => { onChangeRole(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
@@ -124,7 +146,7 @@ function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onRespo
           </button>
         )}
 
-        {/* Responsabilidades — visível para T.I, A.C, R.A e R.M (pode ver si mesmo) */}
+        {/* Responsabilidades — T.I, A.C, R.A e R.M */}
         {canAssign && (
           <button onClick={() => { onResponsabilidades(usuario); onClose() }}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:bg-white/8 hover:text-white transition-colors text-left">
@@ -135,8 +157,8 @@ function ContextMenu({ x, y, usuario, papel, isMe, onEdit, onChangeRole, onRespo
           </button>
         )}
 
-        {/* Remover — apenas T.I e não a si mesmo */}
-        {!isMe && isTI && (
+        {/* Remover — T.I remove qualquer um; A.C remove quem está abaixo */}
+        {!isMe && canManage && (
           <>
             <div className="mx-2 my-1 h-px bg-white/8" />
             <button onClick={() => { onDelete(usuario); onClose() }}
@@ -291,7 +313,12 @@ function MudarCargoModal({ usuario, onSalvar, onClose, currentUserRole }) {
           <label className="label">Novo Cargo</label>
           <select value={papel} onChange={e => setPapel(e.target.value)} className="input">
             <option value="">Selecione...</option>
-            {(currentUserRole === 'T.I' ? PAPEIS : PAPEIS.filter(p => p !== 'T.I')).map(p => <option key={p} value={p}>{p} — {PAPEL_LABELS[p]}</option>)}
+            {(() => {
+              const meuNivel = nivelCargo(currentUserRole)
+              // T.I pode atribuir qualquer cargo; demais só atribuem cargos abaixo do seu nível
+              return PAPEIS.filter(p => currentUserRole === 'T.I' || nivelCargo(p) < meuNivel)
+                .map(p => <option key={p} value={p}>{p} — {PAPEL_LABELS[p]}</option>)
+            })()}
           </select>
         </div>
         {erro && <p className="text-xs text-red-400 bg-red-900/20 border border-red-500/20 rounded px-3 py-2">{erro}</p>}
@@ -487,7 +514,7 @@ function ConfirmarRemocaoModal({ usuario, onConfirmar, onClose }) {
 
 export default function ERPPage({ session }) {
   const papel = session?.user?.user_metadata?.papel
-  const { isAC, isTI: isTIPerfil, isRA, isRM, setorIds, podeVerERP } = usePerfil(session)
+  const { isAC, isTI, isRA, isRM, setorIds, podeVerERP, podeVerUsuarios, isMaster } = usePerfil(session)
 
   const { usuarios, loading, erro, listar, criar, remover } = useAdminUsuarios()
   const { responsabilidades, metasLm, loading: loadingResp } = useResponsabilidades()
@@ -541,8 +568,14 @@ export default function ERPPage({ session }) {
   }
 
   const usuariosFiltrados = usuarios.filter(u => {
+    // T.I vê tudo
+    if (isMaster) {
+      const q = busca.toLowerCase()
+      return !q || u.email?.toLowerCase().includes(q) || u.papel?.toLowerCase().includes(q) || u.nome?.toLowerCase().includes(q)
+    }
+
     // Esconder T.I se não for T.I
-    if (papel !== 'T.I' && u.papel === 'T.I') return false
+    if (u.papel === 'T.I') return false
 
     // Se for R.A ou R.M, filtra apenas usuários que tenham alguma responsabilidade em comum no setor
     if (isRA || isRM) {
@@ -570,7 +603,7 @@ export default function ERPPage({ session }) {
             {loading || loadingResp ? 'Carregando...' : `${usuariosFiltrados.length} usuário${usuariosFiltrados.length !== 1 ? 's' : ''} encontrados`}
             &nbsp;·&nbsp;
             <span className="text-slate-600">
-              {isTIPerfil || isAC
+              {isTI || isAC
                 ? 'Clique com botão direito para ações'
                 : 'Clique com botão direito para gerenciar responsabilidades'
               }

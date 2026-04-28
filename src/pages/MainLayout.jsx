@@ -8,6 +8,8 @@ import DashboardPage  from './DashboardPage'
 import ERPPage        from './ERPPage'
 import ProfilePage    from './ProfilePage'
 
+import { usePerfil } from '../hooks/usePerfil'
+
 // ─── Cores dos badges de papel ────────────────────────────────────────────────
 
 const PAPEL_BADGE_COLORS = {
@@ -80,7 +82,7 @@ const NAV = [
   {
     id: 'erp',
     label: 'ERP',
-    roles: ['A.C', 'T.I', 'R.A', 'R.M'],
+    requiresERP: true,
     icon: (
       <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -130,9 +132,9 @@ export default function MainLayout({ session }) {
   const [page, setPage]   = useState('dashboard')
   const [badges, setBadges] = useState({ kanban: 0 })
   const connStatus = useConnectionStatus()
+  const { papel, podeVerERP, isMaster } = usePerfil(session)
 
   const cpf          = session.user.email?.replace('@aguia.com', '') ?? '—'
-  const papel        = session.user.user_metadata?.papel ?? 'Usuário'
   const nome         = session.user.user_metadata?.nome ?? cpf
   const senhaTrocada = !!session.user.user_metadata?.senha_trocada
 
@@ -159,15 +161,10 @@ export default function MainLayout({ session }) {
 
   // ── Redirecionamento para páginas restritas ─────────────────────────────────
   useEffect(() => {
-    const paginasRestritas = {
-      erp: ['A.C', 'T.I', 'R.A', 'R.M'],
-    }
-
-    const restricao = paginasRestritas[page]
-    if (restricao && !restricao.includes(papel)) {
+    if (page === 'erp' && !podeVerERP) {
       setPage('dashboard')
     }
-  }, [page, papel])
+  }, [page, podeVerERP])
 
   // ── Badges: contar lançamentos aguardando aprovação ─────────────────────────
   const fetchBadges = useCallback(async () => {
@@ -216,7 +213,7 @@ export default function MainLayout({ session }) {
 
         {/* Navegação */}
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-          {NAV.filter(n => !n.roles || n.roles.includes(papel)).map(n => {
+          {NAV.filter(n => !n.requiresERP || podeVerERP).map(n => {
             const isActive = page === n.id
             return (
               <button
@@ -265,6 +262,7 @@ export default function MainLayout({ session }) {
                 {todosPapeis.map(p => (
                   <span key={p} className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[p] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
                     {p}
+                    {p === 'T.I' && <span className="ml-1 opacity-70 text-[8px]">★</span>}
                   </span>
                 ))}
               </div>

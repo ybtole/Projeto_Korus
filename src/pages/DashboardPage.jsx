@@ -937,15 +937,18 @@ export default function DashboardPage({ session }) {
     setorIds,
     metasPermitidas,
     isAC,
+    isTI,
+    isMaster,
     isLM,
   } = usePerfil(session)
 
   useEffect(() => {
-    if (isAC) return
+    // T.I e A.C vêem todos os setores — não pré-seleciona nenhum
+    if (isAC || isMaster) return
     if (setorIds.length === 1) {
       setSetorId(setorIds[0])
     }
-  }, [isAC, JSON.stringify(setorIds)])
+  }, [isAC, isMaster, JSON.stringify(setorIds)])
 
   // Meses do semestre/ano selecionados
   const mesesSemestre = getMesesSemestre(semestre, ano)
@@ -978,10 +981,10 @@ export default function DashboardPage({ session }) {
     return () => supabase.removeChannel(channel)
   }, [fetchData])
 
-  // ── Filtro local por papel e setor ─────────────────────────────────────────
-  // A.C vê tudo e pode filtrar por setor via select. Demais papéis são restritos.
+  // A.C e T.I (isMaster) vêem tudo e podem filtrar por setor via select.
+  // Demais papéis são restritos aos seus setores.
   const metasFiltradas = (() => {
-    if (isAC) {
+    if (isAC || isMaster) {
       return setorId
         ? metasRaw.filter(m => String(m.setor_id) === String(setorId))
         : metasRaw
@@ -999,7 +1002,7 @@ export default function DashboardPage({ session }) {
   )
 
   // Setores visíveis dependem do papel
-  const setoresFiltrados = isAC
+  const setoresFiltrados = (isAC || isMaster)
     ? setores
     : setores.filter(s => setorIds.includes(s.id))
 
@@ -1077,7 +1080,7 @@ export default function DashboardPage({ session }) {
                 setAno={setAno}
                 setorId={setorId}
                 setSetorId={setSetorId}
-                isAC={isAC}
+                isAC={isAC || isMaster}
               />
             )}
             {aba === 'ao_vivo' && (

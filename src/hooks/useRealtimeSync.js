@@ -34,7 +34,10 @@ export function useRealtimeSync(callbacks = {}) {
     const tables = Object.keys(callbacks)
     if (tables.length === 0) return
 
-    const channelName = `sync-${tables.sort().join('-')}`
+    // Adicionamos um ID único para evitar o erro "cannot add postgres_changes after subscribe"
+    // quando múltiplos componentes usam o mesmo hook para as mesmas tabelas.
+    const instanceId = Math.random().toString(36).substring(2, 9)
+    const channelName = `sync-${tables.sort().join('-')}-${instanceId}`
     const channel = supabase.channel(channelName)
 
     tables.forEach(table => {
