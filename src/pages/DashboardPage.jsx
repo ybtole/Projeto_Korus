@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useSetores } from '../hooks/useSetores'
 import { usePerfil } from '../hooks/usePerfil'
 import { useConnectionStatus } from '../hooks/useRealtimeSync'
+import { useThemeColors } from '../hooks/useTheme'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ function calcularPercentualMeta(meta, lancamento) {
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function TabBar({ aba, setAba, connStatus, lancamentos }) {
+  const t = useThemeColors()
   const aoVivoCount = lancamentos.filter(l => l.status === 'EM_ANDAMENTO').length
   const aguardandoCount = lancamentos.filter(l => l.status === 'AGUARDANDO_APROVACAO').length
 
@@ -126,7 +128,7 @@ function TabBar({ aba, setAba, connStatus, lancamentos }) {
   ]
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 24px', backgroundColor: '#0d1e30', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: `1px solid ${t.border}`, padding: '0 24px', backgroundColor: 'var(--bg-secondary)', flexShrink: 0 }}>
       {tabs.map(tab => {
         const active = aba === tab.id
         return (
@@ -139,7 +141,7 @@ function TabBar({ aba, setAba, connStatus, lancamentos }) {
               border: 'none',
               borderBottom: active ? '2px solid #2a6099' : '2px solid transparent',
               background: active ? 'rgba(42,96,153,0.12)' : 'transparent',
-              color: active ? '#93c5fd' : 'rgba(148,163,184,0.7)',
+              color: active ? '#93c5fd' : t.textMuted,
               cursor: 'pointer',
               fontSize: 13,
               fontFamily: 'IBM Plex Sans, sans-serif',
@@ -190,7 +192,7 @@ function TabBar({ aba, setAba, connStatus, lancamentos }) {
             display: 'block',
           }} />
         </span>
-        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)', fontFamily: 'IBM Plex Mono, monospace' }}>
+        <span style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
           {connStatus === 'connected' ? 'Sincronizado' : connStatus === 'connecting' ? 'Conectando...' : 'Sem conexão'}
         </span>
       </div>
@@ -200,10 +202,11 @@ function TabBar({ aba, setAba, connStatus, lancamentos }) {
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, icon, accent, pulse }) {
+  const t = useThemeColors()
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      background: t.bg,
+      border: `1px solid ${t.border}`,
       borderRadius: 8,
       padding: '16px 20px',
       display: 'flex',
@@ -221,8 +224,8 @@ function StatCard({ label, value, sub, icon, accent, pulse }) {
         }} />
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        {icon && <span style={{ color: 'rgba(148,163,184,0.7)', display: 'flex' }}>{icon}</span>}
-        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        {icon && <span style={{ color: t.textMuted, display: 'flex' }}>{icon}</span>}
+        <span style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {label}
         </span>
         {pulse && (
@@ -235,20 +238,21 @@ function StatCard({ label, value, sub, icon, accent, pulse }) {
           }} />
         )}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 500, fontFamily: 'IBM Plex Mono, monospace', color: '#f1f5f9', lineHeight: 1 }}>
+      <div style={{ fontSize: 28, fontWeight: 500, fontFamily: 'IBM Plex Mono, monospace', color: t.text, lineHeight: 1 }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
 
 // ── Progress Bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ value, max = 100, color = '#2a6099', animated = false }) {
+  const t = useThemeColors()
   const pct = Math.min((value / max) * 100, 100)
   const barColor = value >= 100 ? '#34d399' : value >= 60 ? '#fbbf24' : color
   return (
-    <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' }}>
+    <div style={{ flex: 1, height: 6, background: t.progressTrack, borderRadius: 3, overflow: 'hidden' }}>
       <div style={{
         width: `${pct}%`, height: '100%', background: barColor,
         borderRadius: 3,
@@ -261,6 +265,7 @@ function ProgressBar({ value, max = 100, color = '#2a6099', animated = false }) 
 
 // ── Meta Row (Ao Vivo) ────────────────────────────────────────────────────────
 function MetaAoVivoCard({ meta, lancamentos }) {
+  const t = useThemeColors()
   const lancsAprovados = lancamentos.filter(l => l.meta_id === meta.id && l.status === 'APROVADO')
   const ultimoLanc = lancamentos.filter(l => l.meta_id === meta.id).sort((a, b) => b.data_criacao?.localeCompare(a.data_criacao ?? '') ?? 0)[0]
   const totalUnidades = lancsAprovados.reduce((s, l) => s + (Number(l.valor) || 0), 0)
@@ -273,8 +278,8 @@ function MetaAoVivoCard({ meta, lancamentos }) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.08)',
+      background: t.bg,
+      border: `1px solid ${t.border}`,
       borderRadius: 8,
       padding: '14px 18px',
       display: 'flex',
@@ -288,7 +293,7 @@ function MetaAoVivoCard({ meta, lancamentos }) {
             backgroundColor: cfg.dot, flexShrink: 0,
             ...(status === 'EM_ANDAMENTO' ? { animation: 'ping 1.5s infinite' } : {}),
           }} />
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: t.textSub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {meta.nome}
           </span>
           <span style={{
@@ -301,17 +306,17 @@ function MetaAoVivoCard({ meta, lancamentos }) {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>{meta.setores?.nome ?? '—'}</span>
-          <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(148,163,184,0.3)', flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>Última atualiz.: {ultimaAtualizacao}</span>
+          <span style={{ fontSize: 11, color: t.textMuted }}>{meta.setores?.nome ?? '—'}</span>
+          <span style={{ width: 3, height: 3, borderRadius: '50%', background: t.textFaint, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: t.textMuted }}>Última atualiz.: {ultimaAtualizacao}</span>
         </div>
       </div>
 
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: 22, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500, color: '#f1f5f9' }}>
+        <div style={{ fontSize: 22, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500, color: t.text }}>
           {totalUnidades.toLocaleString('pt-BR')}
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace' }}>
+        <div style={{ fontSize: 10, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
           {meta.unidade || 'unidades'}
         </div>
       </div>
@@ -321,10 +326,11 @@ function MetaAoVivoCard({ meta, lancamentos }) {
 
 // ── Alerta Row ────────────────────────────────────────────────────────────────
 function AlertaRow({ lancamento, meta, tipo }) {
+  const t = useThemeColors()
   const configs = {
-    atrasado: { border: 'rgba(248,113,113,0.25)', icon: '⚠', iconColor: '#f87171', label: 'ATRASADO', labelBg: 'rgba(248,113,113,0.15)', labelColor: '#f87171' },
-    aguardando: { border: 'rgba(251,191,36,0.25)', icon: '⏳', iconColor: '#fbbf24', label: 'AGUARDANDO', labelBg: 'rgba(251,191,36,0.15)', labelColor: '#fbbf24' },
-    reprovado: { border: 'rgba(148,163,184,0.2)', icon: '✕', iconColor: '#94a3b8', label: 'REPROVADO', labelBg: 'rgba(148,163,184,0.1)', labelColor: '#94a3b8' },
+    atrasado:   { border: 'rgba(248,113,113,0.25)', icon: '⚠', iconColor: '#f87171', label: 'ATRASADO',   labelBg: 'rgba(248,113,113,0.15)', labelColor: '#f87171' },
+    aguardando: { border: 'rgba(251,191,36,0.25)',  icon: '⏳', iconColor: '#fbbf24', label: 'AGUARDANDO', labelBg: 'rgba(251,191,36,0.15)',  labelColor: '#fbbf24' },
+    reprovado:  { border: 'rgba(148,163,184,0.2)',  icon: '✕', iconColor: '#94a3b8',  label: 'REPROVADO',  labelBg: 'rgba(148,163,184,0.1)', labelColor: '#94a3b8' },
   }
   const cfg = configs[tipo]
 
@@ -332,16 +338,16 @@ function AlertaRow({ lancamento, meta, tipo }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 16px',
-      background: 'rgba(255,255,255,0.02)',
+      background: t.bgCard,
       border: `1px solid ${cfg.border}`,
       borderRadius: 6,
     }}>
       <span style={{ fontSize: 13, color: cfg.iconColor, flexShrink: 0 }}>{cfg.icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, color: '#cbd5e1', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 13, color: t.textSub, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {meta?.nome ?? '—'}
         </p>
-        <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', margin: '2px 0 0' }}>
+        <p style={{ fontSize: 11, color: t.textMuted, margin: '2px 0 0' }}>
           {getMesLabel(lancamento.mes_referencia)}
           {lancamento.observacoes ? ` · ${lancamento.observacoes}` : ''}
         </p>
@@ -359,14 +365,14 @@ function AlertaRow({ lancamento, meta, tipo }) {
 
 // ── FilterBar — barra de filtros com labels, setor, semestre e ano ─────────────
 function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, setores, podeVerTodosSetores }) {
+  const t = useThemeColors()
   const anos = getAnosDisponiveis()
 
-  // Estilo compartilhado para os selects
   const selectStyle = {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: t.selectBg,
+    border: `1px solid ${t.selectBorder}`,
     borderRadius: 4,
-    color: '#94a3b8',
+    color: t.selectColor,
     fontSize: 11,
     padding: '4px 8px',
     fontFamily: 'IBM Plex Mono, monospace',
@@ -375,13 +381,12 @@ function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, se
     width: '100%',
   }
 
-  // Estilo do label acima de cada filtro
   const labelStyle = {
     fontSize: 9,
     fontFamily: 'IBM Plex Mono, monospace',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
-    color: 'rgba(148,163,184,0.4)',
+    color: t.textFaint,
     marginBottom: 4,
     display: 'block',
   }
@@ -457,6 +462,7 @@ function FilterBar({ semestre, setSemestre, ano, setAno, setorId, setSetorId, se
 
 // ─── Aba Geral ────────────────────────────────────────────────────────────────
 function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, setAno, setorId, setSetorId, isAC }) {
+  const t = useThemeColors()
   const aprovados = lancamentos.filter(l => l.status === 'APROVADO').length
   const total = lancamentos.length
   const emAndamento = lancamentos.filter(l => l.status === 'EM_ANDAMENTO').length
@@ -555,13 +561,13 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
 
       {/* Barra PPR geral */}
       <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: t.bg,
+        border: `1px solid ${t.border}`,
         borderRadius: 8,
         padding: '16px 20px',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <span style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Progresso PPR geral do semestre
           </span>
           <span style={{
@@ -573,16 +579,16 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
         </div>
         <ProgressBar value={pprGanho} max={120} animated />
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>0%</span>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>60%</span>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>120% máx.</span>
+          <span style={{ fontSize: 10, color: t.textFaint }}>0%</span>
+          <span style={{ fontSize: 10, color: t.textFaint }}>60%</span>
+          <span style={{ fontSize: 10, color: t.textFaint }}>120% máx.</span>
         </div>
       </div>
 
       {/* Por setor */}
       {porSetor.length > 0 && (
         <div>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+          <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
             Resultado por setor
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -590,11 +596,11 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
               <div key={setor.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 16px',
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: t.bgCard,
+                border: `1px solid ${t.borderSubtle}`,
                 borderRadius: 6,
               }}>
-                <span style={{ fontSize: 12, color: '#94a3b8', width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, color: t.textMuted, width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {setor.nome}
                 </span>
                 <ProgressBar value={pct} max={100} />
@@ -605,7 +611,7 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
                 }}>
                   {pct}%
                 </span>
-                <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: t.textFaint, flexShrink: 0 }}>
                   {metasS.length} meta{metasS.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -619,6 +625,7 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
 
 // ─── Aba Ao Vivo ──────────────────────────────────────────────────────────────
 function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
+  const t = useThemeColors()
   const emAndamento = lancamentos.filter(l => l.status === 'EM_ANDAMENTO')
   const aprovadosHoje = lancamentos.filter(l => {
     if (l.status !== 'APROVADO') return false
@@ -656,7 +663,7 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
           <span style={{ fontSize: 11, color: '#60a5fa', fontFamily: 'IBM Plex Mono, monospace' }}>
             ⬤ {emAndamento.length} em andamento
           </span>
-          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace' }}>
+          <span style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
             atualizado às {lastUpdate}
           </span>
         </div>
@@ -664,15 +671,15 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
 
       {/* Em andamento agora */}
       <div>
-        <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+        <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
           ⬤ Metas em andamento — {emAndamento.length}
         </p>
         {emAndamento.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             padding: '40px 20px',
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: t.bgCard,
+            border: `1px solid ${t.borderSubtle}`,
             borderRadius: 8,
             gap: 8,
           }}>
@@ -680,10 +687,10 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
               <circle cx="20" cy="20" r="16"/>
               <path d="M14 20l4 4 8-8"/>
             </svg>
-            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.5)', margin: 0 }}>
+            <p style={{ fontSize: 13, color: t.textMuted, margin: 0 }}>
               Nenhuma meta em andamento no momento
             </p>
-            <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.35)', margin: 0 }}>
+            <p style={{ fontSize: 11, color: t.textFaint, margin: 0 }}>
               Quando um operador iniciar uma meta, ela aparecerá aqui em tempo real
             </p>
           </div>
@@ -701,7 +708,7 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
       {/* Aprovados hoje */}
       {aprovadosHoje.length > 0 && (
         <div>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+          <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
             ✓ Aprovados hoje — {aprovadosHoje.length}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -716,11 +723,11 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
                   borderRadius: 6,
                 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34d399', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: '#cbd5e1', flex: 1 }}>{meta?.nome ?? '—'}</span>
+                  <span style={{ fontSize: 13, color: t.textSub, flex: 1 }}>{meta?.nome ?? '—'}</span>
                   <span style={{ fontSize: 13, fontFamily: 'IBM Plex Mono, monospace', color: '#34d399' }}>
                     {Number(l.valor).toLocaleString('pt-BR')} {meta?.unidade ?? ''}
                   </span>
-                  <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', fontFamily: 'IBM Plex Mono, monospace' }}>
+                  <span style={{ fontSize: 11, color: t.textFaint, fontFamily: 'IBM Plex Mono, monospace' }}>
                     {new Date(l.data_criacao).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -733,7 +740,7 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
       {/* Metas recentes (24h) */}
       {metasRecentes.length > 0 && (
         <div>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+          <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
             Atividade — últimas 24h
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -749,6 +756,7 @@ function AbaAoVivo({ lancamentos, metas, lastUpdate }) {
 
 // ─── Aba Pendentes ────────────────────────────────────────────────────────────
 function AbaPendentes({ lancamentos, metas }) {
+  const t = useThemeColors()
   const hoje = new Date()
 
   const atrasados = lancamentos.filter(l => {
@@ -778,7 +786,7 @@ function AbaPendentes({ lancamentos, metas }) {
             <circle cx="20" cy="20" r="16"/>
           </svg>
           <p style={{ fontSize: 14, color: '#34d399', margin: 0 }}>Nenhum alerta pendente</p>
-          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.4)', margin: 0 }}>Tudo em ordem por aqui.</p>
+          <p style={{ fontSize: 12, color: t.textFaint, margin: 0 }}>Tudo em ordem por aqui.</p>
         </div>
       ) : (
         <>
@@ -808,7 +816,7 @@ function AbaPendentes({ lancamentos, metas }) {
           )}
           {reprovados.length > 0 && (
             <div>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.6)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
                 ✕ Reprovadas — {reprovados.length}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -826,6 +834,7 @@ function AbaPendentes({ lancamentos, metas }) {
 
 // ─── Aba Análise ──────────────────────────────────────────────────────────────
 function AbaAnalise({ lancamentos, metas, setores }) {
+  const t = useThemeColors()
   // Metas com mais aprovações
   const metaStats = metas.map(m => {
     const lancs = lancamentos.filter(l => l.meta_id === m.id)
@@ -847,13 +856,13 @@ function AbaAnalise({ lancamentos, metas, setores }) {
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Distribuição de status */}
       <div>
-        <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+        <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
           Distribuição de status
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
           {statusDist.map(({ status, cfg, count }) => (
             <div key={status} style={{
-              background: 'rgba(255,255,255,0.03)',
+              background: t.bg,
               border: `1px solid ${cfg.bg}`,
               borderRadius: 8,
               padding: '12px 14px',
@@ -862,10 +871,10 @@ function AbaAnalise({ lancamentos, metas, setores }) {
               <div style={{ fontSize: 22, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500, color: cfg.color }}>
                 {count}
               </div>
-              <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', marginTop: 4 }}>{cfg.label}</div>
+              <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{cfg.label}</div>
               <div style={{
                 marginTop: 8, height: 2, borderRadius: 1,
-                background: `linear-gradient(90deg, ${cfg.color} ${totalLancs > 0 ? (count / totalLancs * 100) : 0}%, rgba(255,255,255,0.06) 0%)`,
+                background: `linear-gradient(90deg, ${cfg.color} ${totalLancs > 0 ? (count / totalLancs * 100) : 0}%, ${t.progressTrack} 0%)`,
               }} />
             </div>
           ))}
@@ -875,7 +884,7 @@ function AbaAnalise({ lancamentos, metas, setores }) {
       {/* Ranking de metas */}
       {metaStats.length > 0 && (
         <div>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+          <p style={{ fontSize: 11, color: t.textMuted, fontFamily: 'IBM Plex Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
             Ranking de metas — por taxa de aprovação
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -883,21 +892,21 @@ function AbaAnalise({ lancamentos, metas, setores }) {
               <div key={meta.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 16px',
-                background: 'rgba(255,255,255,0.02)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: t.bgCard,
+                border: `1px solid ${t.borderSubtle}`,
                 borderRadius: 6,
               }}>
                 <span style={{
                   width: 22, height: 22, borderRadius: 4,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: i < 3 ? 'rgba(232,160,32,0.2)' : 'rgba(255,255,255,0.05)',
-                  color: i < 3 ? '#e8a020' : 'rgba(148,163,184,0.4)',
+                  background: i < 3 ? 'rgba(232,160,32,0.2)' : t.bgSubtle,
+                  color: i < 3 ? '#e8a020' : t.textFaint,
                   fontSize: 11, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500,
                   flexShrink: 0,
                 }}>
                   {i + 1}
                 </span>
-                <span style={{ flex: 1, fontSize: 13, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, fontSize: 13, color: t.textSub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {meta.nome}
                 </span>
                 <ProgressBar value={pct} max={100} />
@@ -908,7 +917,7 @@ function AbaAnalise({ lancamentos, metas, setores }) {
                 }}>
                   {pct}%
                 </span>
-                <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: t.textFaint, flexShrink: 0 }}>
                   {aprovados}/{total}
                 </span>
               </div>
@@ -941,6 +950,7 @@ export default function DashboardPage({ session }) {
     isMaster,
     isLM,
   } = usePerfil(session)
+  const t = useThemeColors()
 
   useEffect(() => {
     // T.I e A.C vêem todos os setores — não pré-seleciona nenhum
@@ -1007,7 +1017,7 @@ export default function DashboardPage({ session }) {
     : setores.filter(s => setorIds.includes(s.id))
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#0d1e30', fontFamily: 'IBM Plex Sans, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)', fontFamily: 'IBM Plex Sans, sans-serif' }}>
       <style>{`
         @keyframes ping {
           75%, 100% { transform: scale(2); opacity: 0; }
@@ -1022,8 +1032,8 @@ export default function DashboardPage({ session }) {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 24px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        backgroundColor: '#0d1e30',
+        borderBottom: `1px solid ${t.border}`,
+        backgroundColor: 'var(--bg-secondary)',
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1037,17 +1047,17 @@ export default function DashboardPage({ session }) {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#f1f5f9' }}>Dashboard</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: t.text }}>Dashboard</span>
         </div>
         <button
           onClick={fetchData}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '5px 12px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: t.bgSubtle,
+            border: `1px solid ${t.border}`,
             borderRadius: 5,
-            color: '#94a3b8',
+            color: t.textMuted,
             fontSize: 11,
             cursor: 'pointer',
             fontFamily: 'IBM Plex Mono, monospace',
@@ -1063,7 +1073,7 @@ export default function DashboardPage({ session }) {
       {/* ── Conteúdo ── */}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'rgba(148,163,184,0.5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: t.textMuted }}>
             <div style={{ width: 16, height: 16, border: '1.5px solid rgba(42,96,153,0.8)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
             <span style={{ fontSize: 13 }}>Carregando...</span>
           </div>

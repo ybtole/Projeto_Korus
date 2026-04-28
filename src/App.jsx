@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
+import { ThemeProvider } from './hooks/useTheme'
 import LoginPage from './pages/LoginPage'
 import MainLayout from './pages/MainLayout'
 
@@ -31,5 +32,9 @@ export default function App() {
     )
   }
 
-  return session ? <MainLayout session={session} /> : <LoginPage />
+  return (
+    <ThemeProvider>
+      {session ? <MainLayout session={session} /> : <LoginPage />}
+    </ThemeProvider>
+  )
 }

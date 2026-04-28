@@ -2,45 +2,221 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-brand-900 text-slate-100 font-sans antialiased;
-  }
-
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #2a6099 #0d1e30;
-  }
-
-  *::-webkit-scrollbar { width: 6px; height: 6px; }
-  *::-webkit-scrollbar-track { background: #0d1e30; }
-  *::-webkit-scrollbar-thumb { background: #2a6099; border-radius: 3px; }
+/* ── Design Tokens: Dark Mode (padrão) ─────────────────────────────────────── */
+:root {
+  --bg-primary:    #0d1e30;
+  --bg-secondary:  #102030;
+  --bg-card:       rgba(13,30,48,0.6);
+  --bg-input:      #0d1e30;
+  --bg-btn:        rgba(255,255,255,0.05);
+  --bg-btn-hover:  rgba(255,255,255,0.10);
+  --bg-nav-active: rgba(42,96,153,0.20);
+  --border:        rgba(255,255,255,0.08);
+  --border-input:  rgba(255,255,255,0.10);
+  --border-card:   rgba(255,255,255,0.08);
+  --border-btn:    rgba(255,255,255,0.10);
+  --border-active: rgba(42,96,153,0.30);
+  --text-primary:  #f1f5f9;
+  --text-secondary:#94a3b8;
+  --text-muted:    #64748b;
+  --text-nav-active:#bfdbfe;
+  --text-nav:      #94a3b8;
+  --text-nav-hover:#f1f5f9;
+  --scrollbar-track: #0d1e30;
+  --scrollbar-thumb: #2a6099;
 }
 
+/* ── Design Tokens: Light Mode ─────────────────────────────────────────────── */
+.light {
+  --bg-primary:    #f0f4f8;
+  --bg-secondary:  #e2eaf3;
+  --bg-card:       rgba(255,255,255,0.92);
+  --bg-input:      #ffffff;
+  --bg-btn:        rgba(0,0,0,0.05);
+  --bg-btn-hover:  rgba(0,0,0,0.09);
+  --bg-nav-active: rgba(42,96,153,0.12);
+  --border:        rgba(0,0,0,0.08);
+  --border-input:  rgba(0,0,0,0.15);
+  --border-card:   rgba(0,0,0,0.08);
+  --border-btn:    rgba(0,0,0,0.12);
+  --border-active: rgba(42,96,153,0.40);
+  --text-primary:  #0f172a;
+  --text-secondary:#1e293b;
+  --text-muted:    #475569;
+  --text-nav-active:#1e40af;
+  --text-nav:      #1e293b;
+  --text-nav-hover:#0f172a;
+  --scrollbar-track: #e2eaf3;
+  --scrollbar-thumb: #2a6099;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  body {
+    @apply font-sans antialiased;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  *::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+}
+
+/* ── Components ────────────────────────────────────────────────────────────── */
 @layer components {
   .btn {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
-           border border-white/10 bg-white/5 hover:bg-white/10 
            transition-all duration-150 cursor-pointer select-none;
+    background-color: var(--bg-btn);
+    border: 1px solid var(--border-btn);
+    color: var(--text-secondary);
+  }
+  .btn:hover {
+    background-color: var(--bg-btn-hover);
+    color: var(--text-primary);
   }
   .btn-primary {
-    @apply btn bg-brand-500 border-brand-500 hover:bg-brand-500/80 text-white;
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
+           transition-all duration-150 cursor-pointer select-none;
+    background-color: #2a6099;
+    border: 1px solid #2a6099;
+    color: #fff !important;
   }
+  .btn-primary:hover { background-color: rgba(42,96,153,0.8); }
   .btn-danger {
-    @apply btn border-red-500/40 text-red-400 hover:bg-red-500/10;
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium
+           transition-all duration-150 cursor-pointer select-none;
+    background-color: var(--bg-btn);
+    border: 1px solid rgba(239,68,68,0.4);
+    color: #f87171;
   }
+  .btn-danger:hover { background-color: rgba(239,68,68,0.1); }
   .card {
-    @apply bg-brand-900/60 border border-white/8 rounded-lg backdrop-blur-sm;
+    @apply rounded-lg backdrop-blur-sm;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-card);
   }
   .input {
-    @apply w-full bg-brand-900 border border-white/10 rounded px-3 py-2 text-sm
-           text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500
-           transition-colors;
+    @apply w-full rounded px-3 py-2 text-sm focus:outline-none transition-colors;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-input);
+    color: var(--text-primary);
   }
+  .input::placeholder { color: var(--text-muted); }
+  .input:focus { border-color: #2a6099; }
   .label {
-    @apply block text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide;
+    @apply block text-xs mb-1 font-medium uppercase tracking-wide;
+    color: var(--text-muted);
   }
 }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────────── */
+.sidebar {
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+.nav-item {
+  color: var(--text-nav);
+  border: 1px solid transparent;
+  transition: all 0.1s;
+}
+.nav-item:hover { color: var(--text-nav-hover); background-color: var(--bg-btn-hover); }
+.nav-item.active { background-color: var(--bg-nav-active); color: var(--text-nav-active); border-color: var(--border-active); }
+.sidebar-divider { background-color: var(--border); }
+.sidebar-footer { border-top: 1px solid var(--border); }
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+/* LIGHT MODE OVERRIDES — covers hardcoded Tailwind classes across all pages   */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/* Backgrounds */
+.light .bg-brand-900,
+.light .bg-brand-900\/60,
+.light [class*="bg-brand-900"] { background-color: var(--bg-card) !important; }
+.light .bg-white\/5 { background-color: rgba(0,0,0,0.03) !important; }
+.light .bg-white\/8 { background-color: rgba(0,0,0,0.05) !important; }
+.light .bg-white\/10 { background-color: rgba(0,0,0,0.07) !important; }
+.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04) !important; }
+.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
+
+/* Text colors */
+.light .text-white { color: #0f172a !important; }
+.light .text-slate-100 { color: #0f172a !important; }
+.light .text-slate-200 { color: #1e293b !important; }
+.light .text-slate-300 { color: #334155 !important; }
+.light .text-slate-400 { color: #475569 !important; }
+.light .text-slate-500 { color: #64748b !important; }
+.light .text-slate-600 { color: #64748b !important; }
+
+/* Borders */
+.light .border-white\/8 { border-color: rgba(0,0,0,0.08) !important; }
+.light .border-white\/10 { border-color: rgba(0,0,0,0.10) !important; }
+.light .border-white\/5 { border-color: rgba(0,0,0,0.05) !important; }
+.light .border-white\/20 { border-color: rgba(0,0,0,0.12) !important; }
+.light [class*="divide-white"] > * + * { border-color: rgba(0,0,0,0.08) !important; }
+
+/* Card-like containers — convert dark patterns */
+.light .bg-slate-800,
+.light .bg-slate-700,
+.light .bg-slate-900 { background-color: #e8edf4 !important; }
+.light .bg-slate-800\/50 { background-color: rgba(220,228,240,0.8) !important; }
+
+/* Recharts (gráficos do Dashboard) */
+.light .recharts-cartesian-grid-horizontal line,
+.light .recharts-cartesian-grid-vertical line { stroke: rgba(0,0,0,0.08) !important; }
+.light .recharts-text { fill: #64748b !important; }
+.light .recharts-tooltip-wrapper .recharts-default-tooltip { 
+  background-color: #fff !important; 
+  border-color: rgba(0,0,0,0.10) !important; 
+}
+
+/* Kanban columns */
+.light .kanban-col,
+.light [class*="rounded"][class*="border"][class*="bg-white"] { background-color: #e8edf4 !important; }
+
+/* Modal backdrop */
+.light .bg-black\/60 { background-color: rgba(0,0,0,0.35) !important; }
+.light .bg-black\/50 { background-color: rgba(0,0,0,0.25) !important; }
+
+/* Overlay / dark panels */
+.light .bg-brand-900\/80,
+.light .bg-brand-900\/90 { background-color: rgba(255,255,255,0.95) !important; }
+
+/* Form backgrounds inside cards */
+.light input[class*="bg-brand-900"],
+.light select[class*="bg-brand-900"],
+.light textarea[class*="bg-brand-900"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(0,0,0,0.15) !important;
+}
+
+/* Tables */
+.light thead tr { background-color: rgba(0,0,0,0.04) !important; }
+.light tbody tr:hover { background-color: rgba(0,0,0,0.03) !important; }
+
+/* SVG strokes that use currentColor will adapt, but ensure icon wrappers adapt too */
+.light .text-slate-400 svg, .light .text-slate-500 svg { opacity: 0.85; }
+
+/* Status badges in light mode */
+.light .badge-PENDENTE          { background: #e2e8f0; color: #475569; }
+.light .badge-EM_ANDAMENTO      { background: #dbeafe; color: #1d4ed8; }
+.light .badge-AGUARDANDO_APROVACAO { background: #fef3c7; color: #92400e; }
+.light .badge-APROVADO          { background: #dcfce7; color: #166534; }
+.light .badge-REPROVADO         { background: #fee2e2; color: #991b1b; }
+
+/* Neural tree */
+.light .neural-line { stroke: #93c5fd; }
 
 /* Neural tree SVG lines */
 .neural-line {
@@ -55,18 +231,16 @@
   stroke-width: 2;
   stroke-dasharray: none;
 }
-@keyframes dash {
-  to { stroke-dashoffset: -200; }
-}
+@keyframes dash { to { stroke-dashoffset: -200; } }
 
 /* Kanban drag */
-.kanban-card-dragging {
-  @apply opacity-50 rotate-1 scale-105;
-}
+.kanban-card-dragging { @apply opacity-50 rotate-1 scale-105; }
 
-/* Status badges */
-.badge-PENDENTE          { @apply bg-slate-700 text-slate-300; }
-.badge-EM_ANDAMENTO      { @apply bg-blue-900/60 text-blue-300; }
-.badge-AGUARDANDO_APROVACAO { @apply bg-amber-900/60 text-amber-300; }
-.badge-APROVADO          { @apply bg-green-900/60 text-green-300; }
-.badge-REPROVADO         { @apply bg-red-900/60 text-red-300; }
+/* Smooth theme transitions */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+/* Don't transition animations/transforms */
+.animate-spin, .animate-pulse, [class*="animate-"] {
+  transition: none !important;
+}

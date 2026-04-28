@@ -3,12 +3,12 @@ import { supabase } from '../lib/supabase'
 import { useResponsabilidades } from '../hooks/useResponsabilidades'
 
 const PAPEL_BADGE_COLORS = {
-  'A.C':     'bg-amber-900/50 text-amber-300 border-amber-500/30',
-  'T.I':     'bg-cyan-900/50 text-cyan-300 border-cyan-500/30',
-  'R.A':     'bg-purple-900/50 text-purple-300 border-purple-500/30',
-  'R.M':     'bg-blue-900/50 text-blue-300 border-blue-500/30',
-  'L.M':     'bg-green-900/50 text-green-300 border-green-500/30',
-  'Usuário': 'bg-slate-800 text-slate-400 border-white/10',
+  'A.C':     'bg-amber-500 text-amber-950 border-amber-600',
+  'T.I':     'bg-cyan-500 text-cyan-950 border-cyan-600',
+  'R.A':     'bg-purple-500 text-purple-950 border-purple-600',
+  'R.M':     'bg-blue-500 text-blue-950 border-blue-600',
+  'L.M':     'bg-green-500 text-green-950 border-green-600',
+  'Usuário': 'bg-slate-500 text-slate-950 border-slate-600',
 }
 
 function formatCpf(nums) {
