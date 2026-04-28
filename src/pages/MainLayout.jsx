@@ -253,8 +253,8 @@ export default function MainLayout({ session }) {
             onClick={() => setPage('perfil')}
             className="flex items-center gap-2.5 mb-3 w-full text-left hover:bg-white/5 rounded-md px-1 -mx-1 py-1 -my-1 transition-colors"
           >
-            <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[11px] text-brand-200 font-mono flex-shrink-0 uppercase">
-              {cpf.replace(/\D/g, '').slice(0, 2)}
+            <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[10px] text-brand-200 font-mono flex-shrink-0 uppercase font-semibold">
+              {nome.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2)}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-slate-300 truncate">{nome}</p>
