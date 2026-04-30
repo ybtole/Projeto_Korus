@@ -41,6 +41,8 @@ export default function KanbanPage({ session }) {
     setorIds,
     metasPermitidas,
     isAC,
+    isTI,
+    isMaster,
     isLM,
     podeVerERP,
   } = usePerfil(session)
@@ -50,8 +52,9 @@ export default function KanbanPage({ session }) {
   const mesesDoAno = gerarMeses(Number(anoRef))
 
   const { lancamentos, loading, erro, atualizarStatus, salvar, criar } = useLancamentos({
-    setor_id: isAC ? (filtroSetor || undefined) : undefined,
-    setor_ids: !isAC && setorIds.length > 0 ? setorIds : undefined,
+    // T.I e A.C podem filtrar por setor manualmente; demais papéis são restritos
+    setor_id: (isAC || isMaster) ? (filtroSetor || undefined) : undefined,
+    setor_ids: !isAC && !isMaster && setorIds.length > 0 ? setorIds : undefined,
     meta_ids: isLM && metasPermitidas ? metasPermitidas : undefined,
     mes: filtroMes || undefined,
     ano: filtroAno || undefined,
@@ -86,13 +89,14 @@ export default function KanbanPage({ session }) {
   }, [lancamentos, atualizarStatus])
 
   useEffect(() => {
-    if (isAC) return
+    // T.I e A.C vêem todos os setores — não pré-seleciona nenhum
+    if (isAC || isMaster) return
     if (setorIds.length === 1) {
       setFiltroSetor(setorIds[0])
     }
     // Se tiver múltiplos setores, não força um específico —
     // o filtro por setor_ids no hook cuidará disso
-  }, [isAC, JSON.stringify(setorIds)])
+  }, [isAC, isMaster, JSON.stringify(setorIds)])
 
   async function handleSaveCard(id, payload) {
     await salvar(id, payload)
@@ -129,7 +133,7 @@ export default function KanbanPage({ session }) {
   const temFiltroAtivo = filtroSetor || filtroMes || filtroAno
 
   // Usuário comum não tem acesso ao Kanban
-  if (papel === 'Usuário' && !isAC) {
+  if (papel === 'Usuário' && !isAC && !isMaster) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="card p-8 max-w-sm w-full text-center">
@@ -171,7 +175,7 @@ export default function KanbanPage({ session }) {
       <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
         <div className="flex items-end gap-5 flex-wrap">
 
-          {isAC && (
+          {(isAC || isTI) && (
           <div className="flex flex-col gap-1.5">
             {/* Filtro: Setores */}
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">

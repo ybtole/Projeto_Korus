@@ -56,14 +56,32 @@ export function usePerfil(session) {
 
   useRealtimeSync({ papeis: fetch, metas_lm: fetch })
 
-  const isAC = papel === 'A.C'
   const isTI = papel === 'T.I'
+  const isAC = papel === 'A.C'
   const isRA = papel === 'R.A'
   const isRM = papel === 'R.M'
   const isLM = papel === 'L.M'
-  const podeVerERP    = isAC || isTI || isRA || isRM
-  const podeCriarMeta = isAC
-  const podeAtribuir  = isAC || isRA || isRM
+
+  // ── Hierarquia: T.I > A.C > R.A > R.M > L.M > Usuário ─────────────────────
+  const HIERARQUIA = ['Usuário', 'L.M', 'R.M', 'R.A', 'A.C', 'T.I']
+  
+  const nivelCargo = (cargo) => {
+    const idx = HIERARQUIA.indexOf(cargo)
+    return idx === -1 ? 0 : idx
+  }
+
+  const meuNivel = nivelCargo(papel)
+
+  // T.I é o cargo master: tem acesso irrestrito a tudo no sistema
+  const isMaster = isTI
+  
+  // Permissões baseadas em cargo ou nível
+  const podeVerERP      = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeCriarMeta   = isMaster || isAC
+  const podeExcluirMeta = isMaster || isAC
+  const podeEditarMeta  = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeAtribuir    = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeVerUsuarios = isMaster || isAC
 
   return {
     papel,
@@ -75,8 +93,14 @@ export function usePerfil(session) {
     isRA,
     isRM,
     isLM,
+    isMaster,
+    meuNivel,
+    nivelCargo,
     podeVerERP,
     podeCriarMeta,
+    podeExcluirMeta,
+    podeEditarMeta,
     podeAtribuir,
+    podeVerUsuarios,
   }
 }

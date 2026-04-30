@@ -542,55 +542,56 @@ export default function MetasPage({ session }) {
   const [filtroSemestre, setFiltroSemestre] = useState('')
   const [filtroAno, setFiltroAno] = useState('')
   const { setores } = useSetores()
-  const { papel, setorIds, metasPermitidas, isAC, isLM, podeCriarMeta, loading: perfilLoading } = usePerfil(session)
-
-  const fetchMetas = useCallback(async () => {
-    if (perfilLoading) return;
-
-    setLoading(true)
-    let query = supabase
-      .from('metas')
-      .select('*, setores(nome)')
-      .order('nome')
-
-    if (filtroSetor) query = query.eq('setor_id', filtroSetor)
-    if (filtroArea) {
-      // Find all sectors that are descendants of the selected Area
-      const idsArea = [filtroArea]
-      const queue = [filtroArea]
-      while (queue.length > 0) {
-        const curr = queue.shift()
-        const children = setores.filter(s => s.parent_id === curr).map(s => s.id)
-        idsArea.push(...children)
-        queue.push(...children)
+    const { papel, setorIds, metasPermitidas, isAC, isTI, isLM, podeCriarMeta, podeExcluirMeta, podeEditarMeta, isMaster, loading: perfilLoading } = usePerfil(session)
+  
+    const fetchMetas = useCallback(async () => {
+      if (perfilLoading) return;
+  
+      setLoading(true)
+      let query = supabase
+        .from('metas')
+        .select('*, setores(nome)')
+        .order('nome')
+  
+      if (filtroSetor) query = query.eq('setor_id', filtroSetor)
+      if (filtroArea) {
+        // Find all sectors that are descendants of the selected Area
+        const idsArea = [filtroArea]
+        const queue = [filtroArea]
+        while (queue.length > 0) {
+          const curr = queue.shift()
+          const children = setores.filter(s => s.parent_id === curr).map(s => s.id)
+          idsArea.push(...children)
+          queue.push(...children)
+        }
+        query = query.in('setor_id', idsArea)
       }
-      query = query.in('setor_id', idsArea)
-    }
-    if (filtroSemestre) query = query.eq('semestre', filtroSemestre)
-    if (filtroAno) query = query.eq('ano', Number(filtroAno))
-
-    if (!isAC) {
-      const hasSetores = setorIds.length > 0
-      const hasMetas = metasPermitidas !== null && metasPermitidas.length > 0
-      
-      if (hasSetores && hasMetas) {
-        query = query.or(`setor_id.in.(${setorIds.join(',')}),id.in.(${metasPermitidas.join(',')})`)
-      } else if (hasSetores) {
-        query = query.in('setor_id', setorIds)
-      } else if (hasMetas) {
-        query = query.in('id', metasPermitidas)
-      } else {
-        setMetas([])
-        setLoading(false)
-        return
+      if (filtroSemestre) query = query.eq('semestre', filtroSemestre)
+      if (filtroAno) query = query.eq('ano', Number(filtroAno))
+  
+      // T.I (isMaster) e A.C vêem todas as metas sem restrição de setor
+      if (!isAC && !isMaster) {
+        const hasSetores = setorIds.length > 0
+        const hasMetas = metasPermitidas !== null && metasPermitidas.length > 0
+        
+        if (hasSetores && hasMetas) {
+          query = query.or(`setor_id.in.(${setorIds.join(',')}),id.in.(${metasPermitidas.join(',')})`)
+        } else if (hasSetores) {
+          query = query.in('setor_id', setorIds)
+        } else if (hasMetas) {
+          query = query.in('id', metasPermitidas)
+        } else {
+          setMetas([])
+          setLoading(false)
+          return
+        }
       }
-    }
 
     const { data, error } = await query
     if (error) setErro(error.message)
     else setMetas(data ?? [])
     setLoading(false)
-  }, [filtroSetor, filtroArea, filtroSemestre, filtroAno, isAC, JSON.stringify(setorIds), JSON.stringify(metasPermitidas), perfilLoading, JSON.stringify(setores)])
+  }, [filtroSetor, filtroArea, filtroSemestre, filtroAno, isAC, isMaster, JSON.stringify(setorIds), JSON.stringify(metasPermitidas), perfilLoading, JSON.stringify(setores)])
 
   useEffect(() => {
     fetchMetas()
@@ -688,7 +689,7 @@ export default function MetasPage({ session }) {
       <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
         <div className="flex items-end gap-5 flex-wrap">
 
-          {isAC && (
+          {(isAC || isTI) && (
           <>
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
@@ -821,8 +822,8 @@ export default function MetasPage({ session }) {
                     onEdit={meta => setModal({ modo: 'editar', meta })}
                     onDelete={handleDelete}
                     onToggleAtivo={handleToggleAtivo}
-                    podeEditar={isAC || papel === 'R.A' || papel === 'R.M'}
-                    podeExcluir={isAC}
+                    podeEditar={podeEditarMeta}
+                    podeExcluir={podeExcluirMeta}
                   />
                 ))}
               </div>

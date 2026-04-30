@@ -1,14 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useResponsabilidades } from '../hooks/useResponsabilidades'
 
 const PAPEL_BADGE_COLORS = {
-  'A.C':     'bg-amber-900/50 text-amber-300 border-amber-500/30',
-  'T.I':     'bg-cyan-900/50 text-cyan-300 border-cyan-500/30',
-  'R.A':     'bg-purple-900/50 text-purple-300 border-purple-500/30',
-  'R.M':     'bg-blue-900/50 text-blue-300 border-blue-500/30',
-  'L.M':     'bg-green-900/50 text-green-300 border-green-500/30',
-  'Usuário': 'bg-slate-800 text-slate-400 border-white/10',
+  'A.C':     'bg-amber-500 text-amber-950 border-amber-600',
+  'T.I':     'bg-cyan-500 text-cyan-950 border-cyan-600',
+  'R.A':     'bg-purple-500 text-purple-950 border-purple-600',
+  'R.M':     'bg-blue-500 text-blue-950 border-blue-600',
+  'L.M':     'bg-green-500 text-green-950 border-green-600',
+  'Usuário': 'bg-slate-500 text-slate-950 border-slate-600',
 }
 
 function formatCpf(nums) {
@@ -64,8 +64,7 @@ export default function ProfilePage({ session }) {
   })
   papeisAdicionais.delete(papel)
 
-  // Exibição da senha atual
-  const [mostrarSenhaAtual, setMostrarSenhaAtual] = useState(false)
+
 
   // Formulário de alteração de senha
   const [cpfConfirm, setCpfConfirm]         = useState('')
@@ -73,9 +72,42 @@ export default function ProfilePage({ session }) {
   const [confirmarSenha, setConfirmarSenha] = useState('')
   const [mostrarNova, setMostrarNova]               = useState(false)
   const [mostrarConfirmar, setMostrarConfirmar]     = useState(false)
+  const [editandoNome, setEditandoNome] = useState(false)
+  const [novoNome, setNovoNome]           = useState(nome)
+  const [loadingNome, setLoadingNome]     = useState(false)
+
+  // Sincroniza o estado local se o nome no metadata mudar (ex: via props)
+  useEffect(() => {
+    setNovoNome(nome)
+  }, [nome])
+
   const [loading, setLoading]   = useState(false)
   const [erro, setErro]         = useState('')
   const [sucesso, setSucesso]   = useState(false)
+
+  const [sucessoNome, setSucessoNome] = useState(false)
+
+  async function handleSalvarNome() {
+    if (!novoNome.trim()) return
+    setLoadingNome(true)
+    setErro('')
+    try {
+      // Atualiza na tabela `usuarios` (banco de dados)
+      const { error: dbError } = await supabase.from('usuarios').update({ nome: novoNome }).eq('id', userId)
+      if (dbError) throw new Error('Não foi possível atualizar o banco de dados. Verifique suas permissões.')
+
+      // Atualiza o metadata localmente usando "nome" (para o app) e "name" (para aparecer no painel do Supabase)
+      await supabase.auth.updateUser({ data: { nome: novoNome, name: novoNome, display_name: novoNome } })
+      
+      setEditandoNome(false)
+      setSucessoNome(true)
+      setTimeout(() => setSucessoNome(false), 3000)
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setLoadingNome(false)
+    }
+  }
 
   async function handleAlterarSenha(e) {
     e.preventDefault()
@@ -114,23 +146,70 @@ export default function ProfilePage({ session }) {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-lg mx-auto px-6 py-8 flex flex-col gap-6">
+      <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col gap-6">
 
         {/* Header */}
         <div className="border-b border-white/8 pb-4">
-          <h1 className="text-base font-semibold text-white">Meu Perfil</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Informações da sua conta</p>
+          <h1 className="text-xl font-semibold text-white tracking-tight">Meu Perfil</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Gerencie suas informações e credenciais</p>
         </div>
 
-        {/* Informações da conta */}
-        <div className="card p-6 flex flex-col gap-5">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Informações da conta</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          {/* Informações da conta */}
+          <div className="card p-6 flex flex-col gap-5 shadow-xl shadow-black/20 border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Informações da conta</p>
 
           <div className="flex flex-col gap-4">
             {/* Nome */}
             <div>
-              <p className="label mb-1">Nome</p>
-              <p className="text-sm text-slate-200 font-medium">{nome}</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="label">Nome</p>
+                {!editandoNome ? (
+                  <button
+                    onClick={() => setEditandoNome(true)}
+                    className="btn flex items-center gap-1.5 px-2 py-1 text-xs"
+                  >
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    Editar
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditandoNome(false)}
+                      className="btn px-2 py-1 text-xs"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSalvarNome}
+                      disabled={loadingNome}
+                      className="btn-primary px-3 py-1 text-xs disabled:opacity-50"
+                    >
+                      {loadingNome ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {editandoNome ? (
+                <input
+                  autoFocus
+                  className="input py-1.5 text-sm"
+                  value={novoNome}
+                  onChange={e => setNovoNome(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSalvarNome()}
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-slate-200 font-medium">{novoNome}</p>
+                  {sucessoNome && (
+                    <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20 flex items-center gap-1 animate-in fade-in zoom-in slide-in-from-left-2 duration-300 ease-out">
+                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Atualizado
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* CPF */}
@@ -176,35 +255,11 @@ export default function ProfilePage({ session }) {
               </div>
             </div>
 
-            {/* Senha atual */}
-            <div>
-              <p className="label mb-1">Senha atual</p>
-              <div className="relative">
-                <input
-                  readOnly
-                  className="input pr-10 font-mono text-slate-300"
-                  type={mostrarSenhaAtual && !senhaTrocada ? 'text' : 'password'}
-                  value={senhaTrocada ? '' : formatCpf(cpfLimpo)}
-                  placeholder={senhaTrocada ? 'Senha personalizada' : undefined}
-                  disabled={senhaTrocada}
-                />
-                {!senhaTrocada && (
-                  <button
-                    type="button"
-                    onClick={() => setMostrarSenhaAtual(v => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1"
-                    tabIndex={-1}
-                  >
-                    {mostrarSenhaAtual ? <EyeOffIcon /> : <EyeIcon />}
-                  </button>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Alterar senha */}
-        <div className="card p-6 flex flex-col gap-5">
+        <div className="card p-6 flex flex-col gap-5 shadow-xl shadow-black/20 border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Alterar senha</p>
 
           {sucesso && (
@@ -293,7 +348,7 @@ export default function ProfilePage({ session }) {
             </button>
           </form>
         </div>
-
+        </div>
       </div>
     </div>
   )

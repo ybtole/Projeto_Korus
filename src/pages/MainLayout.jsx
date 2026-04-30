@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useConnectionStatus } from '../hooks/useRealtimeSync'
+import { useTheme } from '../hooks/useTheme'
 import OrgTreePage    from './OrgTreePage'
 import KanbanPage     from './KanbanPage'
 import MetasPage      from './MetasPage'
@@ -8,15 +9,17 @@ import DashboardPage  from './DashboardPage'
 import ERPPage        from './ERPPage'
 import ProfilePage    from './ProfilePage'
 
+import { usePerfil } from '../hooks/usePerfil'
+
 // ─── Cores dos badges de papel ────────────────────────────────────────────────
 
 const PAPEL_BADGE_COLORS = {
-  'A.C':     'bg-amber-900/50 text-amber-300 border-amber-500/30',
-  'T.I':     'bg-cyan-900/50 text-cyan-300 border-cyan-500/30',
-  'R.A':     'bg-purple-900/50 text-purple-300 border-purple-500/30',
-  'R.M':     'bg-blue-900/50 text-blue-300 border-blue-500/30',
-  'L.M':     'bg-green-900/50 text-green-300 border-green-500/30',
-  'Usuário': 'bg-slate-800 text-slate-400 border-white/10',
+  'A.C':     'bg-amber-500 text-amber-950 border-amber-600',
+  'T.I':     'bg-cyan-500 text-cyan-950 border-cyan-600',
+  'R.A':     'bg-purple-500 text-purple-950 border-purple-600',
+  'R.M':     'bg-blue-500 text-blue-950 border-blue-600',
+  'L.M':     'bg-green-500 text-green-950 border-green-600',
+  'Usuário': 'bg-slate-500 text-slate-950 border-slate-600',
 }
 
 // ─── Navegação ────────────────────────────────────────────────────────────────
@@ -80,7 +83,7 @@ const NAV = [
   {
     id: 'erp',
     label: 'ERP',
-    roles: ['A.C', 'T.I', 'R.A', 'R.M'],
+    requiresERP: true,
     icon: (
       <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -130,9 +133,9 @@ export default function MainLayout({ session }) {
   const [page, setPage]   = useState('dashboard')
   const [badges, setBadges] = useState({ kanban: 0 })
   const connStatus = useConnectionStatus()
+  const { papel, podeVerERP, isMaster } = usePerfil(session)
 
   const cpf          = session.user.email?.replace('@aguia.com', '') ?? '—'
-  const papel        = session.user.user_metadata?.papel ?? 'Usuário'
   const nome         = session.user.user_metadata?.nome ?? cpf
   const senhaTrocada = !!session.user.user_metadata?.senha_trocada
 
@@ -159,15 +162,10 @@ export default function MainLayout({ session }) {
 
   // ── Redirecionamento para páginas restritas ─────────────────────────────────
   useEffect(() => {
-    const paginasRestritas = {
-      erp: ['A.C', 'T.I', 'R.A', 'R.M'],
-    }
-
-    const restricao = paginasRestritas[page]
-    if (restricao && !restricao.includes(papel)) {
+    if (page === 'erp' && !podeVerERP) {
       setPage('dashboard')
     }
-  }, [page, papel])
+  }, [page, podeVerERP])
 
   // ── Badges: contar lançamentos aguardando aprovação ─────────────────────────
   const fetchBadges = useCallback(async () => {
@@ -190,17 +188,19 @@ export default function MainLayout({ session }) {
     return () => supabase.removeChannel(channel)
   }, [fetchBadges])
 
+  const { theme, toggleTheme } = useTheme()
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex bg-brand-900">
+    <div className="min-h-screen flex" style={{ backgroundColor: 'var(--bg-primary)' }}>
 
       {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
       <aside
-        className="w-56 flex-shrink-0 flex flex-col border-r border-white/8"
+        className="sidebar w-56 flex-shrink-0 flex flex-col"
         style={{ minHeight: '100vh', position: 'sticky', top: 0, height: '100vh' }}
       >
         {/* Marca */}
-        <div className="px-4 py-5 border-b border-white/8">
+        <div className="px-4 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-brand-500/30 border border-brand-500/40 flex items-center justify-center flex-shrink-0">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-accent" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -208,27 +208,21 @@ export default function MainLayout({ session }) {
               </svg>
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white leading-none truncate">PCM Águia</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 font-mono">Gestão PPR</p>
+              <p className="text-sm font-semibold leading-none truncate" style={{ color: 'var(--text-primary)' }}>PCM Águia</p>
+              <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>Gestão PPR</p>
             </div>
           </div>
         </div>
 
         {/* Navegação */}
         <nav className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto">
-          {NAV.filter(n => !n.roles || n.roles.includes(papel)).map(n => {
+          {NAV.filter(n => !n.requiresERP || podeVerERP).map(n => {
             const isActive = page === n.id
             return (
               <button
                 key={n.id}
                 onClick={() => setPage(n.id)}
-                className={[
-                  'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm w-full text-left',
-                  'transition-colors duration-100 select-none',
-                  isActive
-                    ? 'bg-brand-500/20 text-brand-200 border border-brand-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent',
-                ].join(' ')}
+                className={['nav-item flex items-center gap-2.5 px-3 py-2 rounded-md text-sm w-full text-left select-none', isActive ? 'active' : ''].join(' ')}
               >
                 {n.icon}
                 <span className="flex-1 truncate">{n.label}</span>
@@ -238,10 +232,10 @@ export default function MainLayout({ session }) {
           })}
 
           {/* ── Informações do ciclo ─────────────────────────────────────── */}
-          <div className="mx-1 my-3 h-px bg-white/8" />
+          <div className="sidebar-divider mx-1 my-3 h-px" />
           <div className="px-3 py-1.5 flex flex-col gap-0.5">
-            <p className="text-[10px] text-slate-600 uppercase tracking-wider">Ciclo ativo</p>
-            <p className="text-xs text-slate-400 font-mono">Fev → Set 2025</p>
+            <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Ciclo ativo</p>
+            <p className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>Fev → Set 2025</p>
           </div>
 
           {/* ── Status de conexão ────────────────────────────────────────── */}
@@ -250,29 +244,59 @@ export default function MainLayout({ session }) {
           </div>
         </nav>
 
-        {/* ── Usuário + Sair ───────────────────────────────────────────────── */}
-        <div className="px-4 py-4 border-t border-white/8 flex-shrink-0">
-          <button
-            onClick={() => setPage('perfil')}
-            className="flex items-center gap-2.5 mb-3 w-full text-left hover:bg-white/5 rounded-md px-1 -mx-1 py-1 -my-1 transition-colors"
-          >
-            <div className="w-7 h-7 rounded-full bg-brand-500/30 border border-brand-500/20 flex items-center justify-center text-[11px] text-brand-200 font-mono flex-shrink-0 uppercase">
-              {cpf.replace(/\D/g, '').slice(0, 2)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-300 truncate">{nome}</p>
-              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                {todosPapeis.map(p => (
-                  <span key={p} className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[p] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
-                    {p}
-                  </span>
-                ))}
+        {/* ── Usuário + Sair + Tema ────────────────────────────────────────── */}
+        <div className="sidebar-footer px-4 py-4 flex-shrink-0">
+          {/* Linha superior: card do usuário + botão de tema */}
+          <div className="flex items-center gap-1.5 mb-3">
+            <button
+              onClick={() => setPage('perfil')}
+              className="flex items-center gap-2.5 flex-1 min-w-0 text-left hover:bg-[var(--bg-btn-hover)] rounded-md px-1 -mx-1 py-1 -my-1 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 uppercase tracking-wide" style={{ background: '#2a6099', color: '#ffffff', letterSpacing: '0.05em' }}>
+                {nome.split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2)}
               </div>
-            </div>
-          </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{nome}</p>
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                  {todosPapeis.map(p => (
+                    <span key={p} className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${PAPEL_BADGE_COLORS[p] ?? PAPEL_BADGE_COLORS['Usuário']}`}>
+                      {p}
+                      {p === 'T.I' && <span className="ml-1 opacity-70 text-[8px]">★</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </button>
+
+            {/* Botão tema */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+              className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+              style={{ background: 'var(--bg-btn)', border: '1px solid var(--border-btn)', color: 'var(--text-secondary)' }}
+            >
+              {theme === 'dark' ? (
+                /* Sol */
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+              ) : (
+                /* Lua */
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                </svg>
+              )}
+            </button>
+          </div>
+
           <button
             onClick={() => supabase.auth.signOut()}
-            className="btn w-full justify-center text-xs py-1.5 text-slate-400 hover:text-red-400 hover:border-red-500/30"
+            className="btn w-full justify-center text-xs py-1.5"
+            style={{ color: 'var(--text-muted)' }}
           >
             Sair
           </button>
@@ -280,7 +304,7 @@ export default function MainLayout({ session }) {
       </aside>
 
       {/* ── Conteúdo principal ────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-auto min-w-0">
+      <main className="flex-1 overflow-auto min-w-0" style={{ backgroundColor: 'var(--bg-primary)' }}>
         {page === 'dashboard' && <DashboardPage session={session} />}
         {page === 'metas'     && <MetasPage     session={session} />}
         {page === 'kanban'    && <KanbanPage    session={session} />}

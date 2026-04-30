@@ -200,13 +200,22 @@ Deno.serve(async (req) => {
     }
     const { data: { user: current } } = await supabaseAdmin.auth.admin.getUserById(user_id)
     const { error } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
-      user_metadata: { ...current?.user_metadata, nome: nome ?? null },
+      user_metadata: { 
+        ...current?.user_metadata, 
+        nome: nome ?? null,
+        name: nome ?? null,
+        display_name: nome ?? null
+      },
     })
+    
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    // Tentar atualizar também a tabela pública de usuários
+    await supabaseAdmin.from('usuarios').update({ nome: nome ?? null }).eq('id', user_id)
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
