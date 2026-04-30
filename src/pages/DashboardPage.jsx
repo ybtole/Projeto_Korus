@@ -51,22 +51,45 @@ const STATUS_CONFIG = {
 
 function calcularPercentualMeta(meta, lancamento) {
   if (!lancamento || lancamento.status !== 'APROVADO') return null
-  const valor = Number(lancamento.valor)
-  if (isNaN(valor)) return null
-  const ranges = meta.ranges ?? []
-  if (ranges.length === 0) return null
-  const sorted = [...ranges].sort((a, b) =>
-    meta.direcao === 'MAXIMIZAR'
-      ? Number(b.de) - Number(a.de)
-      : Number(a.de) - Number(b.de)
-  )
-  for (const r of sorted) {
-    const de = Number(r.de)
-    const ate = r.ate ? Number(r.ate) : Infinity
-    if (meta.direcao === 'MAXIMIZAR') {
-      if (valor >= de && valor <= ate) return Number(r.percentual)
-    } else {
-      if (valor <= de && (r.ate ? valor >= Number(r.ate) : true)) return Number(r.percentual)
+  
+  let ranges = meta.ranges
+  if (typeof ranges === 'string') {
+    try { ranges = JSON.parse(ranges) } catch(e) { ranges = null }
+  }
+
+  const isBooleano = meta.tipo_calculo === 'BOOLEANO'
+  const isCategorico = meta.tipo_calculo === 'CATEGORICO'
+  const isMarginal = meta.tipo_calculo === 'MARGINAL' || meta.tipo_calculo === 'range' || !meta.tipo_calculo
+
+  const valorRaw = lancamento.valor
+
+  if (isBooleano && ranges) {
+    if (String(valorRaw).trim() === ranges.valor_sucesso) return 100
+    if (String(valorRaw).trim() === ranges.valor_falha) return 0
+    return 0
+  }
+
+  if (isCategorico && Array.isArray(ranges)) {
+    const found = ranges.find(c => String(c.categoria).trim() === String(valorRaw).trim())
+    return found ? Number(found.percentual) : 0
+  }
+
+  if (isMarginal) {
+    const valor = Number(valorRaw)
+    if (isNaN(valor) || !Array.isArray(ranges) || ranges.length === 0) return null
+    const sorted = [...ranges].sort((a, b) =>
+      meta.direcao === 'MAXIMIZAR'
+        ? Number(b.de) - Number(a.de)
+        : Number(a.de) - Number(b.de)
+    )
+    for (const r of sorted) {
+      const de = Number(r.de)
+      const ate = r.ate ? Number(r.ate) : Infinity
+      if (meta.direcao === 'MAXIMIZAR') {
+        if (valor >= de && valor <= ate) return Number(r.percentual)
+      } else {
+        if (valor <= de && (r.ate ? valor >= Number(r.ate) : true)) return Number(r.percentual)
+      }
     }
   }
   return 0

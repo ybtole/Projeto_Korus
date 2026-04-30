@@ -167,6 +167,15 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
 
   const [form, setForm] = useState(() => {
     if (isEdit && meta) {
+      let parsedRanges = meta.ranges
+      if (typeof parsedRanges === 'string') {
+        try { parsedRanges = JSON.parse(parsedRanges) } catch (e) { parsedRanges = null }
+      }
+      
+      const isBooleano = meta.tipo_calculo === 'BOOLEANO'
+      const isCategorico = meta.tipo_calculo === 'CATEGORICO'
+      const isMarginal = meta.tipo_calculo === 'MARGINAL' || meta.tipo_calculo === 'range'
+
       return {
         ...EMPTY_FORM,
         nome: meta.nome ?? '',
@@ -178,10 +187,10 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         dia_lancamento: meta.dia_lancamento ?? '28',
         semestre: meta.semestre ?? 'FEV_SET',
         ano: meta.ano ? String(meta.ano) : String(anoAtual),
-        tipo_calculo: meta.tipo_calculo ?? 'MARGINAL',
-        config_booleano: meta.config_booleano ?? EMPTY_FORM.config_booleano,
-        config_categorico: meta.config_categorico ?? EMPTY_FORM.config_categorico,
-        ranges: meta.ranges ?? EMPTY_FORM.ranges,
+        tipo_calculo: meta.tipo_calculo === 'range' ? 'MARGINAL' : (meta.tipo_calculo === 'booleano' ? 'BOOLEANO' : (meta.tipo_calculo === 'categorico' ? 'CATEGORICO' : (meta.tipo_calculo ?? 'MARGINAL'))),
+        config_booleano: isBooleano && parsedRanges ? parsedRanges : EMPTY_FORM.config_booleano,
+        config_categorico: isCategorico && Array.isArray(parsedRanges) ? parsedRanges : EMPTY_FORM.config_categorico,
+        ranges: isMarginal && Array.isArray(parsedRanges) ? parsedRanges : EMPTY_FORM.ranges,
       }
     }
     return { ...EMPTY_FORM }
@@ -200,6 +209,12 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
     setLoading(true)
     setErro('')
     try {
+      let finalRanges = form.ranges
+      if (form.tipo_calculo === 'BOOLEANO') finalRanges = form.config_booleano
+      if (form.tipo_calculo === 'CATEGORICO') finalRanges = form.config_categorico
+
+      const mapTipo = { 'MARGINAL': 'range', 'BOOLEANO': 'booleano', 'CATEGORICO': 'categorico' }
+
       await onSave({
         nome: form.nome.trim(),
         setor_id: form.setor_id,
@@ -210,10 +225,8 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
         dia_lancamento: Number(form.dia_lancamento),
         semestre: form.semestre,
         ano: Number(form.ano) || anoAtual,
-        tipo_calculo: form.tipo_calculo,
-        config_booleano: form.config_booleano,
-        config_categorico: form.config_categorico,
-        ranges: form.ranges,
+        tipo_calculo: mapTipo[form.tipo_calculo] || form.tipo_calculo,
+        ranges: typeof finalRanges === 'string' ? finalRanges : JSON.stringify(finalRanges),
       })
       onClose()
     } catch (e) {
@@ -424,6 +437,15 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
     ? (totalPesoSetor / numMetasSetor).toFixed(2)
     : null
 
+  let parsedRanges = meta.ranges
+  if (typeof parsedRanges === 'string') {
+    try { parsedRanges = JSON.parse(parsedRanges) } catch(e) { parsedRanges = null }
+  }
+
+  const isBooleano = meta.tipo_calculo === 'BOOLEANO' || meta.tipo_calculo === 'booleano'
+  const isCategorico = meta.tipo_calculo === 'CATEGORICO' || meta.tipo_calculo === 'categorico'
+  const isMarginal = meta.tipo_calculo === 'MARGINAL' || meta.tipo_calculo === 'range' || !meta.tipo_calculo
+
   return (
     <div className={`card p-4 transition-all ${isAtiva ? '' : 'opacity-50'}`}>
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -483,25 +505,25 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
         </div>
       )}
 
-      {(meta.tipo_calculo === 'BOOLEANO' && meta.config_booleano) && (
+      {(isBooleano && parsedRanges) && (
         <div className="mt-3 pt-3 border-t border-white/8">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Booleano PPR</p>
           <div className="flex flex-wrap gap-2">
             <span className="text-[10px] font-mono bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-300">
-              {meta.config_booleano.valor_sucesso} = 100%
+              {parsedRanges.valor_sucesso} = 100%
             </span>
             <span className="text-[10px] font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-300">
-              {meta.config_booleano.valor_falha} = 0%
+              {parsedRanges.valor_falha} = 0%
             </span>
           </div>
         </div>
       )}
 
-      {(meta.tipo_calculo === 'CATEGORICO' && meta.config_categorico?.length > 0) && (
+      {(isCategorico && Array.isArray(parsedRanges)) && (
         <div className="mt-3 pt-3 border-t border-white/8">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Categorias PPR</p>
           <div className="flex flex-wrap gap-1">
-            {meta.config_categorico.map((c, i) => (
+            {parsedRanges.map((c, i) => (
               <span key={i} className="text-[10px] font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-200">
                 {c.categoria} = {c.percentual}%
               </span>
@@ -510,11 +532,11 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
         </div>
       )}
 
-      {((!meta.tipo_calculo || meta.tipo_calculo === 'MARGINAL') && meta.ranges?.length > 0) && (
+      {(isMarginal && Array.isArray(parsedRanges)) && (
         <div className="mt-3 pt-3 border-t border-white/8">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Faixas PPR</p>
           <div className="flex flex-wrap gap-1">
-            {meta.ranges.map((r, i) => (
+            {parsedRanges.map((r, i) => (
               <span key={i} className="text-[10px] font-mono bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded text-brand-200">
                 {r.de}–{r.ate || '∞'} = {r.percentual}%
               </span>

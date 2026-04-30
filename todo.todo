@@ -20,4 +20,4 @@ Verificar para que serve botão de pause nas metas. - OK
 Verificar necessidade de espaço de "andamento" em progressão de metas. - OK
 Poder ver responsáveis e participantes do setor pela estrutura oragazicional. - OK
 Verificar click em perfil de usuário - OK 
-Arrumar ao criar meta diz que não tem no supabase (Could not find the 'config_booleano' column of 'metas' in the schema cache)
+Arrumar ao criar meta diz que não tem no supabase (Could not find the 'config_booleano' column of 'metas' in the schema cache) - OK 
