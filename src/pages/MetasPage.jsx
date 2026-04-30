@@ -445,15 +445,15 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {podeEditar && (
-            <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs">✎</button>
+            <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs" title="Editar meta">✎</button>
           )}
           {podeEditar && (
-            <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400">
+            <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400" title={isAtiva ? 'Inativar meta (Pausar)' : 'Ativar meta (Retomar)'}>
               {isAtiva ? '⏸' : '▶'}
             </button>
           )}
           {podeExcluir && (
-            <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs">✕</button>
+            <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs" title="Excluir meta">✕</button>
           )}
         </div>
       </div>

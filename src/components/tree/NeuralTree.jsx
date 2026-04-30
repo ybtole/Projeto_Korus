@@ -151,8 +151,10 @@ function Edge({ from, to, animated }) {
   )
 }
 
-export default function NeuralTree({ setores, canEdit, onAdd, onEdit, onDelete }) {
-  const [selected, setSelected] = useState(null)
+export default function NeuralTree({ setores, canEdit, onAdd, onEdit, onDelete, selectedNodeId, onNodeSelect }) {
+  const [internalSelected, setInternalSelected] = useState(null)
+  const selected = selectedNodeId !== undefined ? selectedNodeId : internalSelected
+  const setSelected = onNodeSelect || setInternalSelected
   const [grabbing, setGrabbing] = useState(false)
 
   const panMoved    = useRef(false)

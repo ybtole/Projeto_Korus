@@ -66,10 +66,17 @@ function calcularPercentualMeta(meta, lancamento) {
     if (meta.direcao === 'MAXIMIZAR') {
       if (valor >= de && valor <= ate) return Number(r.percentual)
     } else {
-      if (valor <= de && valor >= (r.ate ? ate : 0)) return Number(r.percentual)
+      if (valor <= de && (r.ate ? valor >= Number(r.ate) : true)) return Number(r.percentual)
     }
   }
   return 0
+}
+
+function getNumLancamentos(meta, semestreAno) {
+  const meses = getMesesSemestre(meta.semestre || 'FEV_SET', meta.ano || new Date().getFullYear())
+  if (meta.frequencia === 'BIMESTRAL') return Math.max(1, Math.floor(meses.length / 2))
+  if (meta.frequencia === 'SEMESTRAL') return 1
+  return meses.length
 }
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
@@ -259,6 +266,74 @@ function ProgressBar({ value, max = 100, color = '#2a6099', animated = false }) 
         transition: 'width 0.6s ease',
         ...(animated ? { backgroundImage: `linear-gradient(90deg, ${barColor}, ${barColor}aa, ${barColor})`, backgroundSize: '200% 100%', animation: 'shimmer 1.5s infinite' } : {}),
       }} />
+    </div>
+  )
+}
+
+// ── Meta Progress Timeline ────────────────────────────────────────────────────
+function MetaProgressTimeline({ meta, lancamentos, semestre, ano }) {
+  const t = useThemeColors()
+  const meses = getMesesSemestre(semestre, ano)
+  const hoje = new Date()
+
+  // Filtramos os meses válidos de acordo com a frequência.
+  // Simplificando: vamos mostrar apenas os meses que deveriam ter lançamento.
+  let mesesLancamento = meses
+  if (meta.frequencia === 'BIMESTRAL') {
+    mesesLancamento = meses.filter((_, i) => i % 2 !== 0) // ex: pega os pares finais de bimesters
+  } else if (meta.frequencia === 'SEMESTRAL') {
+    mesesLancamento = [meses[meses.length - 1]]
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+      {mesesLancamento.map(mesKey => {
+        const l = lancamentos.find(x => x.meta_id === meta.id && x.mes_referencia === mesKey)
+        const lbl = getMesLabel(mesKey)
+        let color = t.progressTrack
+        let tooltip = `${lbl}: Pendente`
+
+        if (l) {
+          if (l.status === 'APROVADO') {
+            const pct = calcularPercentualMeta(meta, l) || 0
+            color = pct >= 100 ? '#34d399' : pct > 0 ? '#fbbf24' : '#f87171'
+            tooltip = `${lbl}: Aprovado (${pct}% PPR)`
+          } else if (l.status === 'EM_ANDAMENTO') {
+            color = '#60a5fa'
+            tooltip = `${lbl}: Em Andamento`
+          } else if (l.status === 'AGUARDANDO_APROVACAO') {
+            color = '#fbbf24'
+            tooltip = `${lbl}: Aguard. Aprovação`
+          } else if (l.status === 'REPROVADO') {
+            color = '#94a3b8'
+            tooltip = `${lbl}: Reprovado`
+          }
+        } else {
+          // Pendente. Verificar se está atrasado.
+          const [anoRef, mesNum] = mesKey.split('-').map(Number)
+          if (hoje > new Date(anoRef, mesNum - 1, meta.dia_lancamento ?? 28)) {
+            color = '#f87171' // Atrasado
+            tooltip = `${lbl}: Atrasado`
+          }
+        }
+
+        return (
+          <div key={mesKey} title={tooltip} style={{
+            flex: 1,
+            height: 8,
+            backgroundColor: color,
+            borderRadius: 2,
+            position: 'relative'
+          }}>
+            <div style={{
+              position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+              fontSize: 8, color: t.textFaint, fontFamily: 'IBM Plex Mono, monospace'
+            }}>
+              {lbl}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -481,10 +556,14 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
   // PPR geral acumulado
   let pprGanho = 0
   lancamentos.forEach(l => {
+    if (l.status !== 'APROVADO') return
     const meta = metas.find(m => m.id === l.meta_id)
     if (!meta) return
     const pct = calcularPercentualMeta(meta, l)
-    if (pct !== null) pprGanho += (pct / 100) * ((Number(meta.peso) || 0) / 6)
+    if (pct !== null) {
+      const numLancs = getNumLancamentos(meta, meta.semestre || 'FEV_SET')
+      pprGanho += (pct / 100) * ((Number(meta.peso) || 0) / numLancs)
+    }
   })
 
   // Por setor — filtra apenas os setores relevantes ao filtro atual
@@ -495,10 +574,25 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
   const porSetor = setoresFiltrados.map(s => {
     const metasS = metas.filter(m => m.setor_id === s.id)
     const lancsS = lancamentos.filter(l => metasS.some(m => m.id === l.meta_id))
-    const aprovadosS = lancsS.filter(l => l.status === 'APROVADO').length
-    const totalS = lancsS.length
-    const pct = totalS > 0 ? Math.round((aprovadosS / totalS) * 100) : 0
-    return { setor: s, metas: metasS, lancamentos: lancsS, pct, totalS }
+    
+    let pprSetor = 0
+    let totalPesoS = 0
+    metasS.forEach(m => totalPesoS += (Number(m.peso) || 0))
+
+    lancsS.forEach(l => {
+      if (l.status !== 'APROVADO') return
+      const meta = metasS.find(m => m.id === l.meta_id)
+      if (!meta) return
+      const pctLancamento = calcularPercentualMeta(meta, l)
+      if (pctLancamento !== null) {
+        const numLancs = getNumLancamentos(meta, meta.semestre || 'FEV_SET')
+        // Acumula percentual real PPR alcançado pelo setor
+        pprSetor += (pctLancamento / 100) * ((Number(meta.peso) || 0) / numLancs)
+      }
+    })
+
+    const maxPossivel = totalPesoS > 0 ? (totalPesoS * 1.2) : 120 // Assumindo teto de 120% do peso
+    return { setor: s, metas: metasS, lancamentos: lancsS, pprSetor, maxPossivel, totalS: lancsS.length }
   }).filter(x => x.metas.length > 0)
 
   return (
@@ -592,30 +686,45 @@ function AbaGeral({ lancamentos, metas, setores, semestre, setSemestre, ano, set
             Resultado por setor
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {porSetor.map(({ setor, lancamentos: lancsS, pct, metas: metasS }) => (
-              <div key={setor.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 16px',
-                background: t.bgCard,
-                border: `1px solid ${t.borderSubtle}`,
-                borderRadius: 6,
-              }}>
-                <span style={{ fontSize: 12, color: t.textMuted, width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {setor.nome}
-                </span>
-                <ProgressBar value={pct} max={100} />
-                <span style={{
-                  fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500,
-                  color: pct >= 100 ? '#34d399' : pct >= 60 ? '#fbbf24' : '#f87171',
-                  width: 40, textAlign: 'right', flexShrink: 0,
+            {porSetor.map(({ setor, lancamentos: lancsS, pprSetor, maxPossivel, metas: metasS }) => {
+              // Calcular % relativo ao peso total do setor para a barra (ex: alcançou 50 de 100 = 50%)
+              const relativePct = maxPossivel > 0 ? (pprSetor / maxPossivel) * 120 : 0
+              return (
+                <div key={setor.id} style={{
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                  padding: '12px 16px',
+                  background: t.bgCard,
+                  border: `1px solid ${t.borderSubtle}`,
+                  borderRadius: 6,
                 }}>
-                  {pct}%
-                </span>
-                <span style={{ fontSize: 11, color: t.textFaint, flexShrink: 0 }}>
-                  {metasS.length} meta{metasS.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-            ))}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 12, color: t.textMuted, width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {setor.nome}
+                    </span>
+                    <ProgressBar value={relativePct} max={120} />
+                    <span style={{
+                      fontSize: 12, fontFamily: 'IBM Plex Mono, monospace', fontWeight: 500,
+                      color: relativePct >= 100 ? '#34d399' : relativePct >= 60 ? '#fbbf24' : '#f87171',
+                      width: 50, textAlign: 'right', flexShrink: 0,
+                    }}>
+                      {pprSetor.toFixed(1)}%
+                    </span>
+                  </div>
+                  
+                  {/* Progressão de Metas por Mês */}
+                  <div style={{ paddingLeft: 152, display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                    {metasS.map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 10, color: t.textFaint, width: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={m.nome}>
+                          {m.nome}
+                        </span>
+                        <MetaProgressTimeline meta={m} lancamentos={lancsS} semestre={semestre} ano={ano} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
