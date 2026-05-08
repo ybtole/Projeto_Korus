@@ -33,7 +33,6 @@ export default function KanbanPage({ session }) {
   const [cardModal, setCardModal] = useState(null)
   const [novoModal, setNovoModal] = useState(false)
   const [novoForm, setNovoForm] = useState({ meta_id: '', mes_referencia: '', valor: '' })
-  // Setor selecionado dentro do modal de novo lançamento (para filtrar metas)
   const [setorMeta, setSetorMeta] = useState('')
 
   const {
@@ -45,14 +44,15 @@ export default function KanbanPage({ session }) {
     isMaster,
     isLM,
     podeVerERP,
+    podeMovimentarLancamento,
+    podeAprovarReprovar,
+    userEmail,
   } = usePerfil(session)
 
-  // Meses do ano selecionado no filtro (ou ano atual se "Todos")
   const anoRef = filtroAno || String(anoAtual)
   const mesesDoAno = gerarMeses(Number(anoRef))
 
   const { lancamentos, loading, erro, atualizarStatus, salvar, criar } = useLancamentos({
-    // T.I e A.C podem filtrar por setor manualmente; demais papéis são restritos
     setor_id: (isAC || isMaster) ? (filtroSetor || undefined) : undefined,
     setor_ids: !isAC && !isMaster && setorIds.length > 0 ? setorIds : undefined,
     meta_ids: isLM && metasPermitidas ? metasPermitidas : undefined,
@@ -60,7 +60,6 @@ export default function KanbanPage({ session }) {
     ano: filtroAno || undefined,
   })
   const { setores } = useSetores()
-  // Metas filtradas pelo setor escolhido no modal
   const { metas: metasDisponiveis, loading: loadingMetas } = useMetas(
     setorMeta || null,
     null,
@@ -81,25 +80,52 @@ export default function KanbanPage({ session }) {
     const novoStatus = over.id
     const l = lancamentos.find(x => x.id === active.id)
     if (!l || l.status === novoStatus) return
+
+    const statusAprovacao = ['APROVADO', 'REPROVADO']
+    const statusLancamento = ['PENDENTE', 'EM_ANDAMENTO', 'AGUARDANDO_APROVACAO']
+
+    if (statusAprovacao.includes(novoStatus) && !podeAprovarReprovar) return
+    if (statusLancamento.includes(novoStatus) && !podeMovimentarLancamento) return
+    if (novoStatus === 'AGUARDANDO_APROVACAO') return
+
     try {
       await atualizarStatus(active.id, novoStatus)
     } catch (e) {
       console.error(e)
     }
-  }, [lancamentos, atualizarStatus])
+  }, [lancamentos, atualizarStatus, podeAprovarReprovar, podeMovimentarLancamento])
+
+  const handleIniciar = useCallback(async (id) => {
+    try {
+      await atualizarStatus(id, 'EM_ANDAMENTO')
+    } catch (e) {
+      console.error(e)
+    }
+  }, [atualizarStatus])
+
+  const perfilCtx = {
+    isLM,
+    isAC,
+    isMaster,
+    metasPermitidas,
+    userEmail,
+  }
 
   useEffect(() => {
-    // T.I e A.C vêem todos os setores — não pré-seleciona nenhum
     if (isAC || isMaster) return
     if (setorIds.length === 1) {
       setFiltroSetor(setorIds[0])
     }
-    // Se tiver múltiplos setores, não força um específico —
-    // o filtro por setor_ids no hook cuidará disso
   }, [isAC, isMaster, JSON.stringify(setorIds)])
 
   async function handleSaveCard(id, payload) {
-    await salvar(id, payload)
+    const { status: novoStatus, ...resto } = payload
+    if (Object.keys(resto).length > 0) {
+      await salvar(id, resto)
+    }
+    if (novoStatus) {
+      await atualizarStatus(id, novoStatus)
+    }
   }
 
   async function handleCriar(e) {
@@ -121,7 +147,7 @@ export default function KanbanPage({ session }) {
 
   function handleSetFiltroAno(ano) {
     setFiltroAno(ano)
-    setFiltroMes('') // reseta mês ao trocar o ano para evitar valor inválido
+    setFiltroMes('')
   }
 
   function limparFiltros() {
@@ -132,7 +158,6 @@ export default function KanbanPage({ session }) {
 
   const temFiltroAtivo = filtroSetor || filtroMes || filtroAno
 
-  // Usuário comum não tem acesso ao Kanban
   if (papel === 'Usuário' && !isAC && !isMaster) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -154,7 +179,6 @@ export default function KanbanPage({ session }) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
       <div className="px-6 py-4 border-b border-white/8 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-base font-semibold text-white">Kanban de Lançamentos</h1>
@@ -171,13 +195,11 @@ export default function KanbanPage({ session }) {
         )}
       </div>
 
-      {/* Filtros */}
       <div className="px-6 py-3 border-b border-white/5 flex-shrink-0">
         <div className="flex items-end gap-5 flex-wrap">
 
           {(isAC || isTI) && (
           <div className="flex flex-col gap-1.5">
-            {/* Filtro: Setores */}
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
               Setores
             </span>
@@ -192,7 +214,6 @@ export default function KanbanPage({ session }) {
           </div>
           )}
 
-          {/* Filtro: Mês */}
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
               Mês
@@ -207,7 +228,6 @@ export default function KanbanPage({ session }) {
             </select>
           </div>
 
-          {/* Filtro: Ano */}
           <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">
               Ano
@@ -224,7 +244,6 @@ export default function KanbanPage({ session }) {
             </select>
           </div>
 
-          {/* Limpar filtros */}
           {temFiltroAtivo && (
             <button
               className="btn text-xs py-1.5 text-slate-400 self-end"
@@ -236,7 +255,6 @@ export default function KanbanPage({ session }) {
         </div>
       </div>
 
-      {/* Board */}
       <div className="flex-1 overflow-auto p-4">
         {loading && (
           <div className="flex items-center justify-center h-40 gap-2 text-slate-500">
@@ -260,25 +278,26 @@ export default function KanbanPage({ session }) {
               onStatusChange={atualizarStatus}
               onCardClick={setCardModal}
               activeId={activeId}
+              canDrag={podeMovimentarLancamento || podeAprovarReprovar}
+              perfilCtx={perfilCtx}
+              onIniciar={handleIniciar}
             />
           </DndContext>
         )}
       </div>
 
-      {/* Card detail modal */}
       {cardModal && (
         <CardModal
           lancamento={cardModal}
           onClose={() => setCardModal(null)}
           onSave={handleSaveCard}
+          perfilCtx={perfilCtx}
         />
       )}
 
-      {/* Novo lançamento modal */}
       {novoModal && (
         <Modal title="Novo Lançamento" onClose={() => setNovoModal(false)}>
           <form onSubmit={handleCriar} className="flex flex-col gap-4">
-            {/* 1. Filtro de setor para restringir a lista de metas — oculto para L.M pois suas metas já são pré-filtradas */}
             {!isLM && (
             <div>
               <label className="label">Setor</label>
@@ -287,7 +306,7 @@ export default function KanbanPage({ session }) {
                 value={setorMeta}
                 onChange={e => {
                   setSetorMeta(e.target.value)
-                  setNovoForm(f => ({ ...f, meta_id: '' })) // limpa meta ao trocar setor
+                  setNovoForm(f => ({ ...f, meta_id: '' }))
                 }}
               >
                 <option value="">Todos os setores</option>
@@ -298,7 +317,6 @@ export default function KanbanPage({ session }) {
             </div>
             )}
 
-            {/* 2. Select de meta filtrado pelo setor */}
             <div>
               <label className="label">Meta</label>
               <select

@@ -30,7 +30,6 @@ export function useLancamentos(filtros = {}) {
 
   useEffect(() => { fetch() }, [fetch])
 
-  // Realtime: ouve lancamentos E metas (mudança de peso/ranges afeta o cálculo)
   useRealtimeSync({ lancamentos: fetch, metas: fetch })
 
   const atualizarStatus = async (id, status) => {
@@ -40,6 +39,35 @@ export function useLancamentos(filtros = {}) {
       .eq('id', id)
     if (error) throw error
     setLancamentos(prev => prev.map(l => l.id === id ? { ...l, status } : l))
+
+    if (status === 'REPROVADO') {
+      const lancamento = lancamentos.find(l => l.id === id)
+      if (lancamento?.criado_por) {
+        const [{ data: usuario }, { data: ciclo }] = await Promise.all([
+          supabase.from('usuarios').select('id').eq('email', lancamento.criado_por).maybeSingle(),
+          supabase.from('ciclos_ppr').select('data_fim').eq('ativo', true).maybeSingle(),
+        ])
+
+        const prazo7dias = new Date()
+        prazo7dias.setDate(prazo7dias.getDate() + 7)
+
+        const prazoFinal = ciclo?.data_fim
+          ? new Date(Math.min(prazo7dias.getTime(), new Date(ciclo.data_fim).getTime()))
+          : prazo7dias
+
+        if (usuario?.id) {
+          await supabase.from('notificacoes').insert({
+            user_id: usuario.id,
+            tipo: 'REPROVACAO',
+            titulo: 'Lançamento reprovado',
+            mensagem: `Meta reprovada. Envie nova justificativa até ${prazoFinal.toLocaleDateString('pt-BR')}.`,
+            lancamento_id: id,
+            meta_id: lancamento.meta_id,
+            lida: false,
+          })
+        }
+      }
+    }
   }
 
   const salvar = async (id, payload) => {

@@ -9,13 +9,12 @@ const COL_CONFIG = {
   REPROVADO:              { label: 'Reprovado',           color: 'text-red-400',    border: 'border-red-800',    dot: 'bg-red-400' },
 }
 
-export default function KanbanColumn({ status, cards, onCardClick }) {
+export default function KanbanColumn({ status, cards, onCardClick, canDrag, perfilCtx, onIniciar }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const cfg = COL_CONFIG[status]
 
   return (
     <div className="flex flex-col min-w-[220px] w-[220px] flex-shrink-0">
-      {/* Header */}
       <div className={`flex items-center gap-2 px-3 py-2.5 rounded-t-lg border-t-2 ${cfg.border} bg-brand-900/40 border-x border-white/8 mb-0`}>
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
         <span className={`text-xs font-semibold uppercase tracking-wider ${cfg.color}`}>
@@ -24,7 +23,6 @@ export default function KanbanColumn({ status, cards, onCardClick }) {
         <span className="ml-auto text-xs text-slate-600 font-mono">{cards.length}</span>
       </div>
 
-      {/* Drop zone */}
       <div
         ref={setNodeRef}
         className={`
@@ -43,6 +41,9 @@ export default function KanbanColumn({ status, cards, onCardClick }) {
             key={l.id}
             lancamento={l}
             onClick={() => onCardClick(l)}
+            canDrag={canDrag}
+            perfilCtx={perfilCtx}
+            onIniciar={onIniciar}
           />
         ))}
       </div>

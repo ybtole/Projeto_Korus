@@ -21,3 +21,8 @@ Verificar necessidade de espaço de "andamento" em progressão de metas. - OK
 Poder ver responsáveis e participantes do setor pela estrutura oragazicional. - OK
 Verificar click em perfil de usuário - OK 
 Arrumar ao criar meta diz que não tem no supabase (Could not find the 'config_booleano' column of 'metas' in the schema cache) - OK 
+Arrumar questão de movimentação de metas por personalidades restritas - OK
+Arrumar aprovação e reprovação de metas - 
+Criar painel de notificações.
+Criar atualização de metas.
+Arrumar painel de lançamentos para fazer lançamentos efetivamente

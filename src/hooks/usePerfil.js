@@ -62,9 +62,8 @@ export function usePerfil(session) {
   const isRM = papel === 'R.M'
   const isLM = papel === 'L.M'
 
-  // ── Hierarquia: T.I > A.C > R.A > R.M > L.M > Usuário ─────────────────────
   const HIERARQUIA = ['Usuário', 'L.M', 'R.M', 'R.A', 'A.C', 'T.I']
-  
+
   const nivelCargo = (cargo) => {
     const idx = HIERARQUIA.indexOf(cargo)
     return idx === -1 ? 0 : idx
@@ -72,16 +71,18 @@ export function usePerfil(session) {
 
   const meuNivel = nivelCargo(papel)
 
-  // T.I é o cargo master: tem acesso irrestrito a tudo no sistema
   const isMaster = isTI
-  
-  // Permissões baseadas em cargo ou nível
-  const podeVerERP      = isMaster || meuNivel >= nivelCargo('R.M')
-  const podeCriarMeta   = isMaster || isAC
-  const podeExcluirMeta = isMaster || isAC
-  const podeEditarMeta  = isMaster || meuNivel >= nivelCargo('R.M')
-  const podeAtribuir    = isMaster || meuNivel >= nivelCargo('R.M')
-  const podeVerUsuarios = isMaster || isAC
+
+  const userEmail = session?.user?.email ?? ''
+
+  const podeVerERP              = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeCriarMeta           = isMaster || isAC
+  const podeExcluirMeta         = isMaster || isAC
+  const podeEditarMeta          = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeAtribuir            = isMaster || meuNivel >= nivelCargo('R.M')
+  const podeVerUsuarios         = isMaster || isAC
+  const podeMovimentarLancamento = isLM || isMaster
+  const podeAprovarReprovar     = isAC || isMaster
 
   return {
     papel,
@@ -102,5 +103,8 @@ export function usePerfil(session) {
     podeEditarMeta,
     podeAtribuir,
     podeVerUsuarios,
+    podeMovimentarLancamento,
+    podeAprovarReprovar,
+    userEmail,
   }
 }

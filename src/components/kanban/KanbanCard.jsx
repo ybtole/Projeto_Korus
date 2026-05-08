@@ -1,18 +1,21 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 
-const STATUS_LABELS = {
-  PENDENTE: 'Pendente',
-  EM_ANDAMENTO: 'Em andamento',
-  AGUARDANDO_APROVACAO: 'Aguard. aprovação',
-  APROVADO: 'Aprovado',
-  REPROVADO: 'Reprovado',
-}
+export default function KanbanCard({ lancamento, onClick, canDrag = false, perfilCtx, onIniciar }) {
+  const { isLM = false, isMaster = false, metasPermitidas = null, userEmail = '' } = perfilCtx ?? {}
 
-export default function KanbanCard({ lancamento, onClick }) {
+  const eResponsavelPelaMeta = isMaster || (isLM && metasPermitidas?.includes(lancamento.meta_id))
+  const eResponsavelPorCriacao = lancamento.criado_por === userEmail
+
+  const mostraIniciar = lancamento.status === 'PENDENTE' && (eResponsavelPelaMeta || eResponsavelPorCriacao)
+  const mostraEvoluir = lancamento.status === 'EM_ANDAMENTO' && eResponsavelPelaMeta
+
+  const dragDisabled = !canDrag || lancamento.status === 'EM_ANDAMENTO'
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: lancamento.id,
     data: { lancamento },
+    disabled: dragDisabled,
   })
 
   const style = {
@@ -23,6 +26,16 @@ export default function KanbanCard({ lancamento, onClick }) {
 
   const meta = lancamento.metas
   const setor = meta?.setores?.nome ?? '—'
+
+  function handleIniciar(e) {
+    e.stopPropagation()
+    onIniciar?.(lancamento.id)
+  }
+
+  function handleEvoluir(e) {
+    e.stopPropagation()
+    onClick?.()
+  }
 
   return (
     <div
@@ -38,15 +51,12 @@ export default function KanbanCard({ lancamento, onClick }) {
         ${isDragging ? 'rotate-1 scale-105 shadow-xl' : ''}
       `}
     >
-      {/* Meta name */}
       <p className="text-sm font-medium text-slate-200 leading-tight mb-1.5 group-hover:text-white transition-colors">
         {meta?.nome ?? `Meta #${lancamento.meta_id}`}
       </p>
 
-      {/* Setor */}
       <p className="text-[10px] text-slate-500 mb-2 font-mono truncate">{setor}</p>
 
-      {/* Value + month */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-mono font-medium text-brand-200">
           {lancamento.valor != null ? lancamento.valor : <span className="text-slate-600 italic">sem valor</span>}
@@ -54,8 +64,27 @@ export default function KanbanCard({ lancamento, onClick }) {
         <span className="text-[10px] text-slate-500 font-mono">{lancamento.mes_referencia}</span>
       </div>
 
-      {/* Bottom line accent */}
       <div className={`mt-2.5 h-0.5 rounded-full opacity-60 ${statusAccent(lancamento.status)}`} />
+
+      {mostraIniciar && (
+        <button
+          onPointerDown={e => e.stopPropagation()}
+          onClick={handleIniciar}
+          className="mt-2 w-full text-[10px] font-semibold py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 transition-colors"
+        >
+          Iniciar
+        </button>
+      )}
+
+      {mostraEvoluir && (
+        <button
+          onPointerDown={e => e.stopPropagation()}
+          onClick={handleEvoluir}
+          className="mt-2 w-full text-[10px] font-semibold py-1 rounded bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 transition-colors"
+        >
+          Evoluir
+        </button>
+      )}
     </div>
   )
 }

@@ -5,7 +5,7 @@ import KanbanCard from './KanbanCard'
 
 const STATUSES = ['PENDENTE', 'EM_ANDAMENTO', 'AGUARDANDO_APROVACAO', 'APROVADO', 'REPROVADO']
 
-const KanbanBoard = memo(function KanbanBoard({ lancamentos, onStatusChange, onCardClick, activeId }) {
+const KanbanBoard = memo(function KanbanBoard({ lancamentos, onStatusChange, onCardClick, activeId, canDrag, perfilCtx, onIniciar }) {
   const byStatus = {}
   STATUSES.forEach(s => { byStatus[s] = [] })
   lancamentos.forEach(l => {
@@ -22,6 +22,9 @@ const KanbanBoard = memo(function KanbanBoard({ lancamentos, onStatusChange, onC
           status={status}
           cards={byStatus[status]}
           onCardClick={onCardClick}
+          canDrag={canDrag}
+          perfilCtx={perfilCtx}
+          onIniciar={onIniciar}
         />
       ))}
 
