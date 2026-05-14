@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useSetores } from '../hooks/useSetores'
 import { usePerfil } from '../hooks/usePerfil'
 import Modal from '../components/shared/Modal'
+import { calcularMeta } from '../utils/calculoMetas'
 
 const ANO_INICIO = 2024
 
@@ -430,6 +431,335 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   )
 }
 
+// ─── Modal de Lançamento (L.M.) ───────────────────────────────────────────────────
+
+function LancamentoModal({ meta, lancamentoAtual, onClose, onSave }) {
+  let parsedRanges = meta.ranges
+  if (typeof parsedRanges === 'string') {
+    try { parsedRanges = JSON.parse(parsedRanges) } catch(e) { parsedRanges = null }
+  }
+
+  const tipoNorm =
+    meta.tipo_calculo === 'booleano' || meta.tipo_calculo === 'BOOLEANO' ? 'BOOLEANO' :
+    meta.tipo_calculo === 'categorico' || meta.tipo_calculo === 'CATEGORICO' ? 'CATEGORICO' :
+    'MARGINAL'
+
+  const categorias = tipoNorm === 'CATEGORICO' && Array.isArray(parsedRanges) ? parsedRanges : []
+  const boolConfig = tipoNorm === 'BOOLEANO' && parsedRanges
+    ? parsedRanges
+    : { valor_sucesso: 'Concluído', valor_falha: 'Não Concluído' }
+
+  const [valorReal, setValorReal] = useState(() => {
+    if (lancamentoAtual?.valor_real !== undefined) return String(lancamentoAtual.valor_real)
+    if (tipoNorm === 'BOOLEANO') return boolConfig.valor_falha
+    if (tipoNorm === 'CATEGORICO' && categorias.length > 0) return categorias[0].categoria
+    return ''
+  })
+  const [loading, setLoading] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const configMeta = {
+    tipo_calculo: tipoNorm,
+    direcao: meta.direcao ?? 'MAXIMIZAR',
+    peso: meta.peso ?? 0,
+    config_booleano: tipoNorm === 'BOOLEANO' ? parsedRanges : null,
+    config_categorico: tipoNorm === 'CATEGORICO' ? parsedRanges : null,
+    ranges: tipoNorm === 'MARGINAL' && Array.isArray(parsedRanges) ? parsedRanges : null,
+  }
+
+  const resultado = valorReal !== '' ? calcularMeta(valorReal, configMeta) : null
+
+  async function handle() {
+    if (valorReal === '' || valorReal === null) return setErro('Informe o valor.')
+    setLoading(true)
+    setErro('')
+    try {
+      await onSave({ meta_id: meta.id, valor_real: valorReal, percentual_atingido: resultado?.percentual_atingido ?? 0 })
+      onClose()
+    } catch(e) {
+      setErro(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title={`Lançar — ${meta.nome}`} onClose={onClose} size="sm">
+      <div className="flex flex-col gap-4">
+        <div className="bg-white/5 rounded-lg p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-400">{meta.setores?.nome ?? '—'}</p>
+            <p className="text-sm font-medium text-white mt-0.5">{meta.nome}</p>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-1 rounded bg-brand-500/15 text-brand-300 border border-brand-500/20">
+            Peso: {meta.peso}%
+          </span>
+        </div>
+
+        <div>
+          <label className="label">
+            {tipoNorm === 'BOOLEANO' ? 'Resultado' :
+             tipoNorm === 'CATEGORICO' ? 'Categoria atingida' :
+             `Valor realizado${meta.unidade ? ` (${meta.unidade})` : ''}`}
+          </label>
+
+          {tipoNorm === 'BOOLEANO' && (
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {[boolConfig.valor_sucesso, boolConfig.valor_falha].map(v => (
+                <button
+                  key={v}
+                  onClick={() => setValorReal(v)}
+                  className={`px-3 py-2.5 rounded border text-sm font-medium transition-all ${
+                    valorReal === v
+                      ? v === boolConfig.valor_sucesso
+                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                        : 'border-red-500/50 bg-red-500/15 text-red-300'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/8'
+                  }`}
+                >{v}</button>
+              ))}
+            </div>
+          )}
+
+          {tipoNorm === 'CATEGORICO' && (
+            <div className="flex flex-wrap gap-2 mt-1">
+              {categorias.map(c => (
+                <button
+                  key={c.categoria}
+                  onClick={() => setValorReal(c.categoria)}
+                  className={`px-3 py-2 rounded border text-sm transition-all ${
+                    valorReal === c.categoria
+                      ? 'border-purple-500/50 bg-purple-500/15 text-purple-300'
+                      : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/8'
+                  }`}
+                >
+                  {c.categoria} <span className="text-[10px] opacity-60">({c.percentual}%)</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {tipoNorm === 'MARGINAL' && (
+            <input
+              className="input mt-1 font-mono"
+              type="number"
+              placeholder={`Ex: 1500${meta.unidade ? ' ' + meta.unidade : ''}`}
+              value={valorReal}
+              onChange={e => setValorReal(e.target.value)}
+              autoFocus
+            />
+          )}
+        </div>
+
+        {resultado && (
+          <div className={`rounded-lg border p-3 flex items-center justify-between ${
+            resultado.percentual_atingido >= 100 ? 'bg-emerald-500/10 border-emerald-500/20' :
+            resultado.percentual_atingido > 0 ? 'bg-amber-500/10 border-amber-500/20' :
+            'bg-red-500/10 border-red-500/20'
+          }`}>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">PPR Calculado</p>
+              <p className={`text-2xl font-mono font-bold mt-0.5 ${
+                resultado.percentual_atingido >= 100 ? 'text-emerald-400' :
+                resultado.percentual_atingido > 0 ? 'text-amber-400' : 'text-red-400'
+              }`}>{resultado.percentual_atingido.toFixed(0)}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Status</p>
+              <p className="text-sm font-medium text-slate-200 mt-0.5">{resultado.status}</p>
+            </div>
+          </div>
+        )}
+
+        {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{erro}</p>}
+      </div>
+
+      <div className="flex gap-2 justify-end mt-4 pt-3 border-t border-white/8">
+        <button onClick={onClose} className="btn">Cancelar</button>
+        <button onClick={handle} disabled={loading || !resultado} className="btn-primary">
+          {loading ? 'Enviando...' : 'Enviar para aprovação'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Notas por Cargo ───────────────────────────────────────────────────────
+
+const PAPEL_COLORS = {
+  'A.C': { av: 'bg-amber-500',  badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+  'T.I': { av: 'bg-cyan-500',   badge: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+  'R.A': { av: 'bg-purple-500', badge: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+  'R.M': { av: 'bg-blue-500',   badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  'L.M': { av: 'bg-emerald-500',badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
+}
+const getCor = p => PAPEL_COLORS[p] ?? { av: 'bg-slate-500', badge: 'bg-slate-500/20 text-slate-400 border-slate-500/30' }
+
+function formatarTempo(ts) {
+  const m = Math.floor((Date.now() - new Date(ts)) / 60000)
+  if (m < 1) return 'agora'
+  if (m < 60) return `há ${m}min`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `há ${h}h`
+  const d = Math.floor(h / 24)
+  return `há ${d} dia${d !== 1 ? 's' : ''}`
+}
+
+function MetaNotasModal({ meta, session, papel, onClose }) {
+  const [notas, setNotas] = useState([])
+  const [novaNota, setNovaNota] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [carregando, setCarregando] = useState(true)
+  const [erraNota, setErraNota] = useState('')
+  const threadRef = useRef(null)
+
+  let parsedRanges = meta.ranges
+  if (typeof parsedRanges === 'string') {
+    try { parsedRanges = JSON.parse(parsedRanges) } catch(e) { parsedRanges = null }
+  }
+  const tipoLabel =
+    meta.tipo_calculo === 'booleano' || meta.tipo_calculo === 'BOOLEANO' ? 'Booleano' :
+    meta.tipo_calculo === 'categorico' || meta.tipo_calculo === 'CATEGORICO' ? 'Categórico' : 'Marginal'
+
+  const fetchNotas = useCallback(async () => {
+    const { data } = await supabase.from('meta_notas').select('*').eq('meta_id', meta.id).order('created_at', { ascending: true })
+    setNotas(data ?? [])
+    setCarregando(false)
+    setTimeout(() => { if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight }, 50)
+  }, [meta.id])
+
+  useEffect(() => {
+    fetchNotas()
+    const ch = supabase.channel(`notas-${meta.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'meta_notas', filter: `meta_id=eq.${meta.id}` }, fetchNotas)
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [fetchNotas])
+
+  async function enviar() {
+    if (!novaNota.trim()) return
+    setEnviando(true)
+    setErraNota('')
+    const nome = session.user.user_metadata?.nome ?? session.user.email?.replace('@aguia.com', '') ?? 'Usuário'
+    const payload = {
+      meta_id: meta.id,
+      user_id: session.user.id,
+      autor_nome: nome,
+      autor_papel: papel ?? 'Usuário',
+      conteudo: novaNota.trim(),
+    }
+    console.log('[MetaNotas] enviando:', payload)
+    const { error } = await supabase.from('meta_notas').insert(payload)
+    if (error) {
+      console.error('[MetaNotas] erro:', error)
+      setErraNota(error.message)
+    } else {
+      setNovaNota('')
+    }
+    setEnviando(false)
+  }
+
+  return (
+    <Modal title={meta.nome} onClose={onClose} size="xl">
+      <div className="flex flex-col gap-4">
+        {/* Resumo da meta */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[{l:'Setor',v:meta.setores?.nome??'—'},{l:'Peso PPR',v:`${meta.peso??0}%`},{l:'Tipo',v:tipoLabel},{l:'Prazo',v:`Dia ${meta.dia_lancamento??28}`}]
+            .map(({l,v})=>(
+              <div key={l} className="bg-white/5 rounded-lg px-3 py-2">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">{l}</p>
+                <p className="text-sm text-white font-medium mt-0.5 truncate">{v}</p>
+              </div>
+          ))}
+        </div>
+
+        {/* Config PPR */}
+        {parsedRanges && (
+          <div className="bg-white/5 rounded-lg px-3 py-2.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Configuração PPR</p>
+            {(meta.tipo_calculo==='booleano'||meta.tipo_calculo==='BOOLEANO') && (
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-xs font-mono bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">{parsedRanges.valor_sucesso} = 100%</span>
+                <span className="text-xs font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-300">{parsedRanges.valor_falha} = 0%</span>
+              </div>
+            )}
+            {(meta.tipo_calculo==='categorico'||meta.tipo_calculo==='CATEGORICO') && Array.isArray(parsedRanges) && (
+              <div className="flex gap-1.5 flex-wrap">{parsedRanges.map((c,i)=>(
+                <span key={i} className="text-xs font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-200">{c.categoria} = {c.percentual}%</span>
+              ))}</div>
+            )}
+            {Array.isArray(parsedRanges) && !['booleano','BOOLEANO','categorico','CATEGORICO'].includes(meta.tipo_calculo) && (
+              <div className="flex gap-1.5 flex-wrap">{parsedRanges.map((r,i)=>(
+                <span key={i} className="text-xs font-mono bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded text-brand-200">{r.de}–{r.ate||'∞'} = {r.percentual}%</span>
+              ))}</div>
+            )}
+          </div>
+        )}
+
+        {/* Thread de notas */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Notas da equipe</span>
+            <div className="flex-1 h-px bg-white/8" />
+            <span className="text-[10px] text-slate-600">{notas.length} nota{notas.length!==1?'s':''}</span>
+          </div>
+          <div ref={threadRef} className="flex flex-col gap-3 max-h-60 overflow-y-auto pr-1 mb-3">
+            {carregando && (
+              <div className="flex items-center justify-center py-8 gap-2 text-slate-500">
+                <div className="w-3.5 h-3.5 border border-brand-500 border-t-transparent rounded-full animate-spin"/>
+                <span className="text-xs">Carregando...</span>
+              </div>
+            )}
+            {!carregando && notas.length===0 && (
+              <div className="text-center py-8 text-slate-600 text-xs">Nenhuma nota ainda. Seja o primeiro a registrar!</div>
+            )}
+            {notas.map(nota => {
+              const cor = getCor(nota.autor_papel)
+              const isOwn = nota.user_id === session.user.id
+              const ini = nota.autor_nome.split(' ').filter(Boolean).map(n=>n[0]).join('').slice(0,2).toUpperCase()
+              return (
+                <div key={nota.id} className={`flex gap-2.5 ${isOwn?'flex-row-reverse':''}`}>
+                  <div className={`w-7 h-7 rounded-full ${cor.av} flex items-center justify-center text-[10px] font-bold flex-shrink-0 text-white uppercase`}>{ini}</div>
+                  <div className={`flex-1 min-w-0 flex flex-col gap-0.5 ${isOwn?'items-end':''}`}>
+                    <div className={`flex items-center gap-1.5 ${isOwn?'flex-row-reverse':''}`}>
+                      <span className="text-xs font-medium text-slate-300 truncate">{nota.autor_nome}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${cor.badge}`}>{nota.autor_papel}</span>
+                      <span className="text-[9px] text-slate-600">{formatarTempo(nota.created_at)}</span>
+                    </div>
+                    <div className={`px-3 py-2 rounded-xl text-sm text-slate-200 leading-relaxed max-w-[85%] whitespace-pre-wrap ${
+                      isOwn?'bg-brand-500/15 border border-brand-500/20 rounded-tr-sm':'bg-white/5 border border-white/8 rounded-tl-sm'
+                    }`}>{nota.conteudo}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {erraNota && (
+            <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded px-3 py-1.5 mb-1">
+              Erro: {erraNota}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <textarea
+              className="input flex-1 resize-none text-sm py-2"
+              placeholder="O que foi feito, o que está sendo feito ou o que será feito... (Ctrl+Enter envia)"
+              value={novaNota}
+              onChange={e=>setNovaNota(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))enviar()}}
+              rows={2}
+              maxLength={1000}
+            />
+            <button onClick={enviar} disabled={enviando||!novaNota.trim()} className="btn-primary px-3 self-end py-2">
+              {enviando?'...':'↑'}
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-600 mt-1">Ctrl+Enter para enviar · {novaNota.length}/1000</p>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Helpers de status ────────────────────────────────────────────────────────
 
 const STATUS_CONFIG = {
@@ -486,7 +816,7 @@ function getStatusKey(lancamento, meta) {
   return 'pendente'
 }
 
-function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir, totalPesoSetor, numMetasSetor, lancamento }) {
+function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir, totalPesoSetor, numMetasSetor, lancamento, onLancar, podeMovimentarLancamento, onVerNotas }) {
   const pct = meta.peso ? `${meta.peso}%` : '—'
   const isAtiva = meta.ativa !== false
   const pesoEquitativo = numMetasSetor > 0 && totalPesoSetor > 0
@@ -539,6 +869,15 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
             <p className="text-xs text-slate-500 mt-0.5">{meta.setores?.nome ?? '—'}</p>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {podeMovimentarLancamento && isAtiva && (
+              <button
+                onClick={() => onLancar(meta)}
+                className="btn py-1 px-2.5 text-xs font-semibold text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                title="Lançar valor desta meta"
+              >
+                ⊕ Lançar
+              </button>
+            )}
             {podeEditar && (
               <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs" title="Editar meta">✎</button>
             )}
@@ -655,6 +994,19 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
             </div>
           </div>
         )}
+
+        {/* Footer: botão de notas */}
+        <div className="mt-3 pt-2.5 border-t border-white/5">
+          <button
+            onClick={() => onVerNotas(meta)}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-slate-500 hover:text-slate-300 hover:bg-white/5 rounded transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+            Ver detalhes &amp; notas da equipe
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -668,16 +1020,18 @@ export default function MetasPage({ session }) {
   )
 
   const [metas, setMetas] = useState([])
-  const [lancamentosMap, setLancamentosMap] = useState({}) // meta_id -> lancamento mais recente
+  const [lancamentosMap, setLancamentosMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(null)
+  const [modalLancamento, setModalLancamento] = useState(null)
+  const [modalNotas, setModalNotas] = useState(null) // { meta }
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroArea, setFiltroArea] = useState('')
   const [filtroSemestre, setFiltroSemestre] = useState('')
   const [filtroAno, setFiltroAno] = useState('')
   const { setores } = useSetores()
-    const { papel, setorIds, metasPermitidas, isAC, isTI, isLM, podeCriarMeta, podeExcluirMeta, podeEditarMeta, isMaster, loading: perfilLoading } = usePerfil(session)
+  const { papel, setorIds, metasPermitidas, isAC, isTI, isLM, podeCriarMeta, podeExcluirMeta, podeEditarMeta, podeMovimentarLancamento, isMaster, loading: perfilLoading } = usePerfil(session)
   
     const fetchMetas = useCallback(async () => {
       if (perfilLoading) return;
@@ -800,6 +1154,17 @@ export default function MetasPage({ session }) {
   async function handleToggleAtivo(meta) {
     const { error } = await supabase.from('metas').update({ ativa: !(meta.ativa !== false) }).eq('id', meta.id)
     if (error) alert(error.message)
+  }
+
+  async function handleLancar({ meta_id, valor_real, percentual_atingido }) {
+    const { error } = await supabase.from('lancamentos').insert({
+      meta_id,
+      valor_real: String(valor_real),
+      percentual_atingido: Number(percentual_atingido),
+      status: 'AGUARDANDO_APROVACAO',
+      user_id: session.user.id,
+    })
+    if (error) throw error
   }
 
   // Agrupar por setor
@@ -988,8 +1353,11 @@ export default function MetasPage({ session }) {
                     onEdit={meta => setModal({ modo: 'editar', meta })}
                     onDelete={handleDelete}
                     onToggleAtivo={handleToggleAtivo}
+                    onLancar={meta => setModalLancamento({ meta })}
+                    onVerNotas={meta => setModalNotas({ meta })}
                     podeEditar={podeEditarMeta}
                     podeExcluir={podeExcluirMeta}
+                    podeMovimentarLancamento={podeMovimentarLancamento}
                   />
                 ))}
               </div>
@@ -1005,6 +1373,24 @@ export default function MetasPage({ session }) {
           setores={setores}
           onSave={handleSave}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {modalLancamento && (
+        <LancamentoModal
+          meta={modalLancamento.meta}
+          lancamentoAtual={lancamentosMap[modalLancamento.meta.id] ?? null}
+          onSave={handleLancar}
+          onClose={() => setModalLancamento(null)}
+        />
+      )}
+
+      {modalNotas && (
+        <MetaNotasModal
+          meta={modalNotas.meta}
+          session={session}
+          papel={papel}
+          onClose={() => setModalNotas(null)}
         />
       )}
     </div>
