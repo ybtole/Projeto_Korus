@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import { useConnectionStatus } from '../hooks/useRealtimeSync'
 import { useTheme } from '../hooks/useTheme'
 import OrgTreePage    from './OrgTreePage'
-import KanbanPage     from './KanbanPage'
 import MetasPage      from './MetasPage'
 import DashboardPage  from './DashboardPage'
 import ERPPage        from './ERPPage'
@@ -53,18 +52,7 @@ const NAV = [
       </svg>
     ),
   },
-  {
-    id: 'kanban',
-    label: 'Lançamentos',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-        <rect x="9" y="3" width="6" height="4" rx="1"/>
-        <line x1="9" y1="12" x2="15" y2="12"/>
-        <line x1="9" y1="16" x2="13" y2="16"/>
-      </svg>
-    ),
-  },
+
   {
     id: 'tree',
     label: 'Estrutura org.',
@@ -133,7 +121,6 @@ function ConnectionDot({ status }) {
 
 export default function MainLayout({ session }) {
   const [page, setPage]   = useState('dashboard')
-  const [badges, setBadges] = useState({ kanban: 0 })
   const connStatus = useConnectionStatus()
   const { papel, podeVerERP, isMaster } = usePerfil(session)
 
@@ -171,26 +158,7 @@ export default function MainLayout({ session }) {
     }
   }, [page, podeVerERP])
 
-  // ── Badges: contar lançamentos aguardando aprovação ─────────────────────────
-  const fetchBadges = useCallback(async () => {
-    const { count } = await supabase
-      .from('lancamentos')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'AGUARDANDO_APROVACAO')
-    setBadges(b => ({ ...b, kanban: count ?? 0 }))
-  }, [])
 
-  useEffect(() => {
-    fetchBadges()
-
-    // Canal dedicado para badges — atualiza o número no menu em tempo real
-    const channel = supabase
-      .channel('main-badges')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, fetchBadges)
-      .subscribe()
-
-    return () => supabase.removeChannel(channel)
-  }, [fetchBadges])
 
   const { theme, toggleTheme } = useTheme()
 
@@ -230,7 +198,6 @@ export default function MainLayout({ session }) {
               >
                 {n.icon}
                 <span className="flex-1 truncate">{n.label}</span>
-                <NavBadge count={n.id === 'kanban' ? badges.kanban : 0} />
               </button>
             )
           })}
@@ -329,7 +296,6 @@ export default function MainLayout({ session }) {
       <main className="flex-1 overflow-auto min-w-0" style={{ backgroundColor: 'var(--bg-primary)' }}>
         {page === 'dashboard' && <DashboardPage session={session} />}
         {page === 'metas'     && <MetasPage     session={session} />}
-        {page === 'kanban'    && <KanbanPage    session={session} />}
         {page === 'tree'      && <OrgTreePage   session={session} />}
         {page === 'erp'       && <ERPPage       session={session} />}
         {page === 'perfil'    && <ProfilePage   session={session} />}

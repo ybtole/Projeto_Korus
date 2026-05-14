@@ -430,7 +430,63 @@ function MetaFormModal({ modo, meta, setores, onSave, onClose }) {
   )
 }
 
-function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir, totalPesoSetor, numMetasSetor }) {
+// ─── Helpers de status ────────────────────────────────────────────────────────
+
+const STATUS_CONFIG = {
+  concluida: {
+    label: 'Concluída',
+    icon: '✓',
+    bar: 'bg-emerald-500',
+    badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    glow: 'shadow-emerald-500/10',
+  },
+  em_progresso: {
+    label: 'Em Progresso',
+    icon: '◑',
+    bar: 'bg-blue-500',
+    badge: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+    glow: 'shadow-blue-500/10',
+  },
+  parcial: {
+    label: 'Parcial',
+    icon: '◔',
+    bar: 'bg-amber-500',
+    badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    glow: 'shadow-amber-500/10',
+  },
+  atrasada: {
+    label: 'Atrasada',
+    icon: '⚠',
+    bar: 'bg-red-500',
+    badge: 'bg-red-500/15 text-red-400 border-red-500/30',
+    glow: 'shadow-red-500/10',
+  },
+  pendente: {
+    label: 'Pendente',
+    icon: '○',
+    bar: 'bg-slate-600',
+    badge: 'bg-slate-700/60 text-slate-400 border-slate-600/40',
+    glow: '',
+  },
+}
+
+function getStatusKey(lancamento, meta) {
+  if (!lancamento) {
+    // Verifica se está atrasada (sem lançamento e passou o dia limite)
+    const hoje = new Date()
+    const diaLimite = Number(meta.dia_lancamento ?? 28)
+    if (hoje.getDate() > diaLimite) return 'atrasada'
+    return 'pendente'
+  }
+  const pct = Number(lancamento.percentual_atingido ?? 0)
+  const statusLanc = lancamento.status ?? ''
+  if (statusLanc === 'APROVADO' || pct >= 100) return 'concluida'
+  if (pct > 0 && pct < 100) return 'parcial'
+  if (statusLanc === 'AGUARDANDO_APROVACAO' || statusLanc === 'EM_PROGRESSO') return 'em_progresso'
+  return 'pendente'
+}
+
+function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExcluir, totalPesoSetor, numMetasSetor, lancamento }) {
   const pct = meta.peso ? `${meta.peso}%` : '—'
   const isAtiva = meta.ativa !== false
   const pesoEquitativo = numMetasSetor > 0 && totalPesoSetor > 0
@@ -446,104 +502,160 @@ function MetaCard({ meta, onEdit, onDelete, onToggleAtivo, podeEditar, podeExclu
   const isCategorico = meta.tipo_calculo === 'CATEGORICO' || meta.tipo_calculo === 'categorico'
   const isMarginal = meta.tipo_calculo === 'MARGINAL' || meta.tipo_calculo === 'range' || !meta.tipo_calculo
 
+  const statusKey = getStatusKey(lancamento, meta)
+  const statusCfg = STATUS_CONFIG[statusKey]
+  const progressPct = lancamento ? Math.min(100, Math.max(0, Number(lancamento.percentual_atingido ?? 0))) : 0
+  const valorReal = lancamento?.valor_real
+
   return (
-    <div className={`card p-4 transition-all ${isAtiva ? '' : 'opacity-50'}`}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-white truncate">{meta.nome}</h3>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
-              meta.direcao === 'MAXIMIZAR'
-                ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                : 'bg-red-500/15 text-red-400 border border-red-500/20'
-            }`}>
-              {meta.direcao === 'MAXIMIZAR' ? '↑ MAX' : '↓ MIN'}
-            </span>
-            {!isAtiva && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">inativa</span>
+    <div className={`card p-0 overflow-hidden transition-all ${
+      isAtiva ? '' : 'opacity-50'
+    }`}>
+      {/* Barra de progresso topo */}
+      <div className="h-0.5 w-full bg-white/5 relative">
+        <div
+          className={`h-full transition-all duration-700 ease-out ${statusCfg.bar}`}
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-white truncate">{meta.nome}</h3>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium ${
+                meta.direcao === 'MAXIMIZAR'
+                  ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                  : 'bg-red-500/15 text-red-400 border border-red-500/20'
+              }`}>
+                {meta.direcao === 'MAXIMIZAR' ? '↑ MAX' : '↓ MIN'}
+              </span>
+              {!isAtiva && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400">inativa</span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">{meta.setores?.nome ?? '—'}</p>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {podeEditar && (
+              <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs" title="Editar meta">✎</button>
+            )}
+            {podeEditar && (
+              <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400" title={isAtiva ? 'Inativar meta (Pausar)' : 'Ativar meta (Retomar)'}>
+                {isAtiva ? '⏸' : '▶'}
+              </button>
+            )}
+            {podeExcluir && (
+              <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs" title="Excluir meta">✕</button>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">{meta.setores?.nome ?? '—'}</p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {podeEditar && (
-            <button onClick={() => onEdit(meta)} className="btn py-1 px-2 text-xs" title="Editar meta">✎</button>
-          )}
-          {podeEditar && (
-            <button onClick={() => onToggleAtivo(meta)} className="btn py-1 px-2 text-xs text-slate-400" title={isAtiva ? 'Inativar meta (Pausar)' : 'Ativar meta (Retomar)'}>
-              {isAtiva ? '⏸' : '▶'}
-            </button>
-          )}
-          {podeExcluir && (
-            <button onClick={() => onDelete(meta)} className="btn-danger py-1 px-2 text-xs" title="Excluir meta">✕</button>
-          )}
-        </div>
-      </div>
 
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div>
-          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Peso</p>
-          <p className="text-slate-200 font-mono font-medium">{pct}</p>
-        </div>
-        <div>
-          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Frequência</p>
-          <p className="text-slate-200">{meta.frequencia ?? 'Mensal'}</p>
-        </div>
-        <div>
-          <p className="text-slate-500 uppercase tracking-wider text-[10px]">Prazo</p>
-          <p className="text-slate-200 font-mono">Dia {meta.dia_lancamento ?? 28}</p>
-        </div>
-      </div>
-
-      {pesoEquitativo !== null && (
-        <div className="mt-2.5 pt-2.5 border-t border-white/5 flex items-center gap-2 text-[10px] text-slate-600 flex-wrap">
-          <span className="font-mono">{numMetasSetor} meta{numMetasSetor !== 1 ? 's' : ''} no setor</span>
-          <span>·</span>
-          <span className="font-mono">{totalPesoSetor % 1 === 0 ? totalPesoSetor : Number(totalPesoSetor).toFixed(2)}% PPR do setor</span>
-          <span>·</span>
-          <span className="font-mono text-slate-500">≈{pesoEquitativo}% por meta</span>
-        </div>
-      )}
-
-      {(isBooleano && parsedRanges) && (
-        <div className="mt-3 pt-3 border-t border-white/8">
-          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Booleano PPR</p>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-[10px] font-mono bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-300">
-              {parsedRanges.valor_sucesso} = 100%
-            </span>
-            <span className="text-[10px] font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-300">
-              {parsedRanges.valor_falha} = 0%
-            </span>
+        {/* Status visual */}
+        <div className={`flex items-center justify-between mb-3 px-3 py-2 rounded-lg border ${
+          statusCfg.badge
+        }`}>
+          <span className="flex items-center gap-1.5 text-xs font-medium">
+            <span className="text-base leading-none">{statusCfg.icon}</span>
+            {statusCfg.label}
+          </span>
+          <div className="text-right">
+            {progressPct > 0 ? (
+              <span className="text-sm font-mono font-bold">{progressPct.toFixed(0)}%</span>
+            ) : (
+              <span className="text-xs opacity-50">—</span>
+            )}
+            {valorReal !== undefined && valorReal !== null && (
+              <p className="text-[10px] opacity-70 mt-0">
+                Último: {valorReal} {meta.unidade ?? ''}
+              </p>
+            )}
           </div>
         </div>
-      )}
 
-      {(isCategorico && Array.isArray(parsedRanges)) && (
-        <div className="mt-3 pt-3 border-t border-white/8">
-          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Categorias PPR</p>
-          <div className="flex flex-wrap gap-1">
-            {parsedRanges.map((c, i) => (
-              <span key={i} className="text-[10px] font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-200">
-                {c.categoria} = {c.percentual}%
+        {/* Barra de progresso interna */}
+        <div className="mb-3">
+          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ease-out ${statusCfg.bar}`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-[9px] text-slate-600 font-mono">
+            <span>0%</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        {/* Info grid */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div>
+            <p className="text-slate-500 uppercase tracking-wider text-[10px]">Peso</p>
+            <p className="text-slate-200 font-mono font-medium">{pct}</p>
+          </div>
+          <div>
+            <p className="text-slate-500 uppercase tracking-wider text-[10px]">Frequência</p>
+            <p className="text-slate-200">{meta.frequencia ?? 'Mensal'}</p>
+          </div>
+          <div>
+            <p className="text-slate-500 uppercase tracking-wider text-[10px]">Prazo</p>
+            <p className="text-slate-200 font-mono">Dia {meta.dia_lancamento ?? 28}</p>
+          </div>
+        </div>
+
+        {pesoEquitativo !== null && (
+          <div className="mt-2.5 pt-2.5 border-t border-white/5 flex items-center gap-2 text-[10px] text-slate-600 flex-wrap">
+            <span className="font-mono">{numMetasSetor} meta{numMetasSetor !== 1 ? 's' : ''} no setor</span>
+            <span>·</span>
+            <span className="font-mono">{totalPesoSetor % 1 === 0 ? totalPesoSetor : Number(totalPesoSetor).toFixed(2)}% PPR do setor</span>
+            <span>·</span>
+            <span className="font-mono text-slate-500">≈{pesoEquitativo}% por meta</span>
+          </div>
+        )}
+
+        {/* Configuração da meta */}
+        {(isBooleano && parsedRanges) && (
+          <div className="mt-3 pt-3 border-t border-white/8">
+            <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Booleano PPR</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="text-[10px] font-mono bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-300">
+                {parsedRanges.valor_sucesso} = 100%
               </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(isMarginal && Array.isArray(parsedRanges)) && (
-        <div className="mt-3 pt-3 border-t border-white/8">
-          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Faixas PPR</p>
-          <div className="flex flex-wrap gap-1">
-            {parsedRanges.map((r, i) => (
-              <span key={i} className="text-[10px] font-mono bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded text-brand-200">
-                {r.de}–{r.ate || '∞'} = {r.percentual}%
+              <span className="text-[10px] font-mono bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded text-red-300">
+                {parsedRanges.valor_falha} = 0%
               </span>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {(isCategorico && Array.isArray(parsedRanges)) && (
+          <div className="mt-3 pt-3 border-t border-white/8">
+            <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Categorias PPR</p>
+            <div className="flex flex-wrap gap-1">
+              {parsedRanges.map((c, i) => (
+                <span key={i} className="text-[10px] font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-200">
+                  {c.categoria} = {c.percentual}%
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(isMarginal && Array.isArray(parsedRanges)) && (
+          <div className="mt-3 pt-3 border-t border-white/8">
+            <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Faixas PPR</p>
+            <div className="flex flex-wrap gap-1">
+              {parsedRanges.map((r, i) => (
+                <span key={i} className="text-[10px] font-mono bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded text-brand-200">
+                  {r.de}–{r.ate || '∞'} = {r.percentual}%
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -556,6 +668,7 @@ export default function MetasPage({ session }) {
   )
 
   const [metas, setMetas] = useState([])
+  const [lancamentosMap, setLancamentosMap] = useState({}) // meta_id -> lancamento mais recente
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(null)
   const [modal, setModal] = useState(null)
@@ -615,6 +728,26 @@ export default function MetasPage({ session }) {
     setLoading(false)
   }, [filtroSetor, filtroArea, filtroSemestre, filtroAno, isAC, isMaster, JSON.stringify(setorIds), JSON.stringify(metasPermitidas), perfilLoading, JSON.stringify(setores)])
 
+  // Busca o lançamento mais recente de cada meta (para exibir status no card)
+  const fetchLancamentos = useCallback(async () => {
+    if (metas.length === 0) return
+    const metaIds = metas.map(m => m.id)
+    const { data } = await supabase
+      .from('lancamentos')
+      .select('meta_id, valor_real, percentual_atingido, status, created_at')
+      .in('meta_id', metaIds)
+      .order('created_at', { ascending: false })
+
+    if (data) {
+      // Mantém apenas o lançamento mais recente por meta
+      const map = {}
+      for (const l of data) {
+        if (!map[l.meta_id]) map[l.meta_id] = l
+      }
+      setLancamentosMap(map)
+    }
+  }, [metas])
+
   useEffect(() => {
     fetchMetas()
     const channel = supabase
@@ -623,6 +756,16 @@ export default function MetasPage({ session }) {
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [fetchMetas])
+
+  useEffect(() => {
+    fetchLancamentos()
+    if (metas.length === 0) return
+    const channel = supabase
+      .channel('lancamentos-metas-status')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, fetchLancamentos)
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [fetchLancamentos, metas])
 
   async function handleSave(payload) {
     // Determina a qual DIVISÃO (Área) o setor pertence
@@ -839,6 +982,7 @@ export default function MetasPage({ session }) {
                   <MetaCard
                     key={m.id}
                     meta={m}
+                    lancamento={lancamentosMap[m.id] ?? null}
                     totalPesoSetor={totalPesoSetor}
                     numMetasSetor={numMetasSetor}
                     onEdit={meta => setModal({ modo: 'editar', meta })}
