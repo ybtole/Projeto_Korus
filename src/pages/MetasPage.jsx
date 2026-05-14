@@ -766,7 +766,7 @@ function MetaNotasModal({ meta, session, papel, onClose }) {
               )}
             </button>
           </div>
-          <p className="text-[10px] text-slate-600 mt-1">Ctrl+Enter para enviar · {novaNota.length}/1000</p>
+          <p className="text-[10px] text-slate-600 mt-1">Enter para enviar · {novaNota.length}/1000</p>
         </div>
       </div>
     </Modal>
