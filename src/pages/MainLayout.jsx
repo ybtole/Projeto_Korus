@@ -10,6 +10,8 @@ import ERPPage        from './ERPPage'
 import ProfilePage    from './ProfilePage'
 
 import { usePerfil } from '../hooks/usePerfil'
+import { useNotifications } from '../hooks/useNotifications'
+import NotificationModal from '../components/notifications/NotificationModal'
 
 // ─── Cores dos badges de papel ────────────────────────────────────────────────
 
@@ -147,6 +149,8 @@ export default function MainLayout({ session }) {
 
   const [dismissed, setDismissed]   = useState(false)
   const [todosPapeis, setTodosPapeis] = useState([papel])
+  const [notifAberto, setNotifAberto] = useState(false)
+  const { notificacoes, unreadCount, marcarComoLida, marcarTodasComoLidas } = useNotifications(session)
 
   useEffect(() => {
     supabase
@@ -268,6 +272,24 @@ export default function MainLayout({ session }) {
               </div>
             </button>
 
+            {/* Botão notificações */}
+            <button
+              onClick={() => setNotifAberto(true)}
+              title="Notificações"
+              className="relative flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center transition-colors"
+              style={{ background: 'var(--bg-btn)', border: '1px solid var(--border-btn)', color: 'var(--text-secondary)' }}
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-mono font-bold flex items-center justify-center leading-none px-0.5">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
             {/* Botão tema */}
             <button
               onClick={toggleTheme}
@@ -312,6 +334,17 @@ export default function MainLayout({ session }) {
         {page === 'erp'       && <ERPPage       session={session} />}
         {page === 'perfil'    && <ProfilePage   session={session} />}
       </main>
+
+      {/* ── Modal de notificações ────────────────────────────────────────── */}
+      {notifAberto && (
+        <NotificationModal
+          onClose={() => setNotifAberto(false)}
+          notificacoes={notificacoes}
+          unreadCount={unreadCount}
+          marcarComoLida={marcarComoLida}
+          marcarTodasComoLidas={marcarTodasComoLidas}
+        />
+      )}
 
       {/* ── Overlay de troca de senha ─────────────────────────────────────── */}
       {!senhaTrocada && page !== 'perfil' && (bloqueante || !dismissed) && (
