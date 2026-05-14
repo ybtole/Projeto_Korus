@@ -720,14 +720,16 @@ function MetaNotasModal({ meta, session, papel, onClose }) {
               return (
                 <div key={nota.id} className={`flex gap-2.5 ${isOwn?'flex-row-reverse':''}`}>
                   <div className={`w-7 h-7 rounded-full ${cor.av} flex items-center justify-center text-[10px] font-bold flex-shrink-0 text-white uppercase`}>{ini}</div>
-                  <div className={`flex-1 min-w-0 flex flex-col gap-0.5 ${isOwn?'items-end':''}`}>
-                    <div className={`flex items-center gap-1.5 ${isOwn?'flex-row-reverse':''}`}>
-                      <span className="text-xs font-medium text-slate-300 truncate">{nota.autor_nome}</span>
+                  <div className={`flex flex-col gap-0.5 ${isOwn?'items-end':'items-start'} max-w-[85%]`}>
+                    <div className={`flex items-center gap-1.5 mb-0.5 ${isOwn?'flex-row-reverse':''}`}>
+                      <span className="text-[11px] font-semibold text-slate-300 truncate">{nota.autor_nome}</span>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${cor.badge}`}>{nota.autor_papel}</span>
                       <span className="text-[9px] text-slate-600">{formatarTempo(nota.created_at)}</span>
                     </div>
-                    <div className={`px-3 py-2 rounded-xl text-sm text-slate-200 leading-relaxed max-w-[85%] whitespace-pre-wrap ${
-                      isOwn?'bg-brand-500/15 border border-brand-500/20 rounded-tr-sm':'bg-white/5 border border-white/8 rounded-tl-sm'
+                    <div className={`px-3 py-2 rounded-2xl text-sm text-slate-200 leading-relaxed whitespace-pre-wrap w-fit ${
+                      isOwn 
+                        ? 'bg-brand-500/20 border border-brand-500/30 rounded-tr-none text-right' 
+                        : 'bg-white/5 border border-white/10 rounded-tl-none'
                     }`}>{nota.conteudo}</div>
                   </div>
                 </div>
@@ -741,16 +743,27 @@ function MetaNotasModal({ meta, session, papel, onClose }) {
           )}
           <div className="flex gap-2">
             <textarea
-              className="input flex-1 resize-none text-sm py-2"
-              placeholder="O que foi feito, o que está sendo feito ou o que será feito... (Ctrl+Enter envia)"
+              className="input flex-1 resize-none text-sm py-2 px-3 bg-white/5 border-white/10 focus:border-brand-500/50"
+              placeholder="Escreva uma nota... (Shift+Enter para pular linha)"
               value={novaNota}
               onChange={e=>setNovaNota(e.target.value)}
-              onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))enviar()}}
+              onKeyDown={e=>{
+                if(e.key==='Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  enviar();
+                }
+              }}
               rows={2}
               maxLength={1000}
             />
-            <button onClick={enviar} disabled={enviando||!novaNota.trim()} className="btn-primary px-3 self-end py-2">
-              {enviando?'...':'↑'}
+            <button onClick={enviar} disabled={enviando||!novaNota.trim()} className="btn-primary w-10 h-10 flex items-center justify-center rounded-xl self-end">
+              {enviando ? (
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : (
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current rotate-90">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              )}
             </button>
           </div>
           <p className="text-[10px] text-slate-600 mt-1">Ctrl+Enter para enviar · {novaNota.length}/1000</p>
